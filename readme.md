@@ -99,6 +99,8 @@ Some sample scenes rendered with this engine.
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
    Global Illumination at <code>128 samples</code> | 2 shapes, 2 lights | <code>3840x1260</code>
 </div>
+    
+<br>
 
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
 | :---------: | :---------------: | :---------: | :--------------------: |
@@ -118,7 +120,9 @@ Some sample scenes rendered with this engine.
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
    Global Illumination at <code>8 samples</code> | 3 shapes, 2 lights | <code>3840x1260</code>
 </div>
-
+    
+<br>
+    
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
 | :---------: | :---------------: | :---------: | :--------------------: |
 | `1920x1080` |        `2`        |    `NA`     |         `2.3s`         |
