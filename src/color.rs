@@ -1,6 +1,6 @@
 extern crate image;
 use image::Rgb;
-use std::ops::{Add, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Color {
@@ -114,5 +114,37 @@ impl Neg for Color {
             g: -self.g,
             b: -self.b,
         }
+    }
+}
+
+impl Div<f64> for Color {
+    type Output = Color;
+
+    fn div(self, other: f64) -> Color {
+        Color {
+            r: self.r / other,
+            g: self.g / other,
+            b: self.b / other,
+        }
+    }
+}
+
+impl Div for Color {
+    type Output = Color;
+
+    fn div(self, other: Color) -> Color {
+        Color {
+            r: self.r / other.r,
+            g: self.g / other.g,
+            b: self.b / other.b,
+        }
+    }
+}
+
+impl Div<Color> for f64 {
+    type Output = Color;
+
+    fn div(self, other: Color) -> Color {
+        other / self
     }
 }

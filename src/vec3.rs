@@ -1,5 +1,5 @@
 // use serde::{Deserialize, Deserializer};
-use std::ops::{Add, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -43,6 +43,14 @@ impl Vec3 {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
             z: self.x * other.y - self.y * other.x,
+        }
+    }
+
+    pub fn abs(&self) -> Vec3 {
+        Vec3 {
+            x: self.y.abs(),
+            y: self.z.abs(),
+            z: self.x.abs(),
         }
     }
 }
@@ -92,6 +100,38 @@ impl Mul<f64> for Vec3 {
             y: self.y * other,
             z: self.z * other,
         }
+    }
+}
+
+impl Div<f64> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, other: f64) -> Vec3 {
+        Vec3 {
+            x: self.x / other,
+            y: self.y / other,
+            z: self.z / other,
+        }
+    }
+}
+
+impl Div for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, other: Vec3) -> Vec3 {
+        Vec3 {
+            x: self.x / other.x,
+            y: self.y / other.y,
+            z: self.z / other.z,
+        }
+    }
+}
+
+impl Div<Vec3> for f64 {
+    type Output = Vec3;
+
+    fn div(self, other: Vec3) -> Vec3 {
+        other / self
     }
 }
 

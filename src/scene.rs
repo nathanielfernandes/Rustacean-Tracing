@@ -7,9 +7,13 @@ use crate::objects::{Object, Tracable};
 use crate::vec3::Vec3;
 use crate::Ray;
 use image::{ImageBuffer, RgbImage};
+use rand::Rng;
 use rayon::prelude::*;
+use std::cmp::Ordering;
 use std::f32::consts::PI;
 use std::time::Instant;
+
+const PDF: f64 = 1.0 / (2.0 * PI as f64);
 
 pub struct Scene {
     pub width: u32,
@@ -17,6 +21,7 @@ pub struct Scene {
     pub fov: f64,
     pub cam_pos: Vec3,
     pub max_depth: u32,
+    pub samples: u32,
     pub shadow_bias: f64,
     pub objects: Vec<Object>,
     pub lights: Vec<Light>, //pub canvas: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
@@ -29,6 +34,7 @@ impl Scene {
         fov: f64,
         cam_pos: Vec3,
         max_depth: u32,
+        samples: u32,
         shadow_bias: f64,
     ) -> Scene {
         Scene {
@@ -37,6 +43,7 @@ impl Scene {
             fov,
             cam_pos,
             max_depth,
+            samples,
             shadow_bias,
             objects: Vec::new(),
             lights: Vec::new(),
@@ -58,7 +65,12 @@ impl Scene {
                 obj.intersects(ray)
                     .map(|distance| Intersection::new(distance, obj))
             })
-            .min_by(|inter1, inter2| inter1.distance.partial_cmp(&inter2.distance).unwrap())
+            .min_by(|inter1, inter2| {
+                inter1
+                    .distance
+                    .partial_cmp(&inter2.distance)
+                    .unwrap_or(Ordering::Equal)
+            })
     }
 
     fn cast(&self, ray: &Ray, curr_depth: u32) -> Color {
@@ -71,11 +83,11 @@ impl Scene {
         }
     }
 
-    fn diffuse_shading(&self, material: &Material, point: Vec3, surf_norm: Vec3) -> Color {
+    fn direct_lighting(&self, material: &Material, point: Vec3, surf_norm: Vec3) -> Color {
         let mut diffuse_color = BLACK;
         let mut specular_highlight = BLACK;
 
-        let reflected = material.albedo / PI as f64;
+        let reflected = material.albedo; // / PI as f64;
 
         for light in &self.lights {
             let light_dir = light.rel_direction(&point);
@@ -109,13 +121,86 @@ impl Scene {
         material.color * (diffuse_color + specular_highlight)
     }
 
+    fn indirect_lighting(
+        &self,
+        direct_lighting: Color,
+        material: &Material,
+        surf_norm: Vec3,
+        point: Vec3,
+        depth: u32,
+    ) -> Color {
+        // diffuse GI
+        let mut indirect_lighting = BLACK;
+        let mut rng = rand::thread_rng();
+
+        let (norm_t, norm_b) = Scene::local_coord_sytem(surf_norm);
+
+        (0..self.samples).for_each(|_| {
+            let r1: f64 = rng.gen_range(0.0_f64..1.0_f64);
+            let r2: f64 = rng.gen_range(0.0_f64..1.0_f64);
+
+            let sample = Scene::uniform_sample_hemisphere(r1, r2);
+            let sample_world = Vec3 {
+                x: sample.x * norm_b.x + sample.y * surf_norm.x + sample.z * norm_t.x,
+                y: sample.x * norm_b.y + sample.y * surf_norm.y + sample.z * norm_t.y,
+                z: sample.x * norm_b.z + sample.y * surf_norm.z + sample.z * norm_t.z,
+            };
+
+            let s_ray = Ray {
+                origin: point + sample_world * self.shadow_bias,
+                direction: sample_world,
+            };
+            indirect_lighting = indirect_lighting + r1 * self.cast(&s_ray, depth + 1) / PDF;
+        });
+
+        indirect_lighting = indirect_lighting / self.samples as f64;
+
+        material.color * (direct_lighting / PI as f64 + 2.0 * indirect_lighting) * material.albedo
+    }
+
+    fn uniform_sample_hemisphere(r1: f64, r2: f64) -> Vec3 {
+        let sin_theta = (1.0 - r1 * r1).sqrt();
+        let phi = 2.0 * PI as f64 * r2;
+        let x = sin_theta * phi.cos();
+        let z = sin_theta * phi.sin();
+
+        Vec3 { x, y: r1, z }
+    }
+
+    fn local_coord_sytem(surf_norm: Vec3) -> (Vec3, Vec3) {
+        let norm_t;
+        if (surf_norm.x > surf_norm.z || surf_norm.y > surf_norm.x) && !(surf_norm.y.abs() > 0.0) {
+            norm_t = Vec3 {
+                x: surf_norm.z,
+                y: 0.0,
+                z: -surf_norm.x,
+            } / (surf_norm.x * surf_norm.x + surf_norm.z * surf_norm.z).sqrt();
+        } else {
+            norm_t = Vec3 {
+                x: 0.0,
+                y: -surf_norm.z,
+                z: surf_norm.y,
+            } / (surf_norm.y * surf_norm.y + surf_norm.z * surf_norm.z).sqrt();
+        }
+
+        let norm_b = surf_norm.cross(&norm_t);
+
+        (norm_t, norm_b)
+    }
+
     fn compute_color(&self, ray: &Ray, intersection: &Intersection, depth: u32) -> Color {
         let point = ray.origin + (ray.direction * intersection.distance);
         let surf_norm = intersection.object.surface_normal(&point);
 
         let material = intersection.object.material();
 
-        let mut final_color = self.diffuse_shading(material, point, surf_norm);
+        let direct_lighting = self.direct_lighting(material, point, surf_norm);
+
+        let mut final_color = if self.samples > 0 {
+            self.indirect_lighting(direct_lighting, material, surf_norm, point, depth)
+        } else {
+            direct_lighting
+        };
 
         if material.reflectivity > 0.0 {
             let reflect_ray = Ray::reflection(surf_norm, ray.direction, point, self.shadow_bias);

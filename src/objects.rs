@@ -127,13 +127,13 @@ impl Plane {
 
 impl Tracable for Plane {
     fn intersects(&self, ray: &Ray) -> Option<f64> {
-        let normal = &self.normal;
-        let denom = normal.dot(&ray.direction);
-        if denom > 1e-6 {
-            let v = self.origin - ray.origin;
-            let distance = v.dot(&normal) / denom;
-            if distance >= 0.0 {
-                return Some(distance);
+        let denominator = self.normal.dot(&ray.direction);
+        if denominator.abs() > 1e-6 {
+            let difference = self.origin - ray.origin;
+            let t = difference.dot(&self.normal) / denominator;
+
+            if t > 1e-6 {
+                return Some(t);
             }
         }
         None

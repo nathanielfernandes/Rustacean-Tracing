@@ -5,13 +5,13 @@
 <div style="width:600px; margin-bottom: 4rem">
 This ray-tracing engine runs entirely on the cpu and is shape/object agnostic.
 
-It has the option to render the scene regulary or in threaded slabs, gaining on average a `5x` performance boost.
+It has the option to render the scene regulary or in threaded slabs, gaining on average a `3x` performance boost.
 
 #### Next Steps
 
 - ~~Specular Highlights~~
 - ~~Reflection~~
-- Global illumination
+- ~~Global illumination~~
 - Transparency/Refraction
 - Texture mapping
 - A few more shapes
@@ -31,7 +31,7 @@ Some sample scenes rendered with this engine.
 </a>
    
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
-    1 shape, 7 lights | <code>7680x4320</code>
+    No Global Illumination | 1 shape, 7 lights | <code>7680x4320</code>
 </div>
 
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
@@ -51,7 +51,7 @@ Some sample scenes rendered with this engine.
 </a>
    
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
-    4 shapes, 2 lights | <code>7680x4320</code>
+    No Global Illumination | 4 shapes, 2 lights | <code>7680x4320</code>
 </div>
 
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
@@ -71,7 +71,7 @@ Some sample scenes rendered with this engine.
 </a>
    
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
-    3 shapes, 2 lights | <code>7680x4320</code>
+   No Global Illumination | 3 shapes, 2 lights | <code>7680x4320</code>
 </div>
 
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
@@ -80,6 +80,42 @@ Some sample scenes rendered with this engine.
 | `3840x2160` |       `28`        |  `28.93s`   |        `6.30s`         |
 | `7680x4320` |       `28`        |  `121.55s`  |        `33.57s`        |
 
-The max number of light bounces greatly affects the speed of the render.
+</div>
+
+### [Render 4]("./samples/sample_4.png")
+
+<div style="width:600px; margin-bottom: 4rem">
+
+<a href="./samples/sample_4.png">
+    <img src="./samples/sample_4.png" >
+</a>
+   
+<div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
+   Global Illumination at <code>128 samples</code> | 2 shapes, 2 lights | <code>3840x1260</code>
+</div>
+
+| Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
+| :---------: | :---------------: | :---------: | :--------------------: |
+| `1920x1080` |        `2`        |    `NA`     |        `6.57m`         |
+| `3840x2160` |        `2`        |    `NA`     |        `23.15m`        |
+
+</div>
+
+### [Render 5]("./samples/sample_5.png")
+
+<div style="width:600px; margin-bottom: 4rem">
+
+<a href="./samples/sample_5.png">
+    <img src="./samples/sample_5.png" >
+</a>
+   
+<div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
+   Global Illumination at <code>8 samples</code> | 3 shapes, 2 lights | <code>3840x1260</code>
+</div>
+
+| Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
+| :---------: | :---------------: | :---------: | :--------------------: |
+| `1920x1080` |        `2`        |    `NA`     |         `2.3s`         |
+| `3840x2160` |        `2`        |    `NA`     |        `9.49s`         |
 
 </div>
