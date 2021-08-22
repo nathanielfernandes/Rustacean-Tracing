@@ -9,9 +9,9 @@ It has the option to render the scene regulary or in threaded slabs, gaining on 
 
 #### Next Steps
 
-- ~~Specular Highlights~~
-- ~~Reflection~~
-- ~~Global illumination~~
+- ~Specular Highlights~
+- ~Reflection~
+- ~Global illumination~
 - Transparency/Refraction
 - Texture mapping
 - A few more shapes
@@ -33,6 +33,8 @@ Some sample scenes rendered with this engine.
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
     No Global Illumination | 1 shape, 7 lights | <code>7680x4320</code>
 </div>
+    
+<br>
 
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
 | :---------: | :---------------: | :---------: | :--------------------: |
@@ -53,6 +55,8 @@ Some sample scenes rendered with this engine.
 <div style="text-align: center; font-size: 14px; margin-bottom: 1rem">
     No Global Illumination | 4 shapes, 2 lights | <code>7680x4320</code>
 </div>
+    
+<br>
 
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
 | :---------: | :---------------: | :---------: | :--------------------: |
@@ -74,6 +78,8 @@ Some sample scenes rendered with this engine.
    No Global Illumination | 3 shapes, 2 lights | <code>7680x4320</code>
 </div>
 
+<br>
+    
 | Resolution  | Max Light Bounces | Render Time | Render Time (threaded) |
 | :---------: | :---------------: | :---------: | :--------------------: |
 | `1920x1080` |       `28`        |  `7.221s`   |        `1.74s`         |
