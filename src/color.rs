@@ -10,6 +10,9 @@ pub struct Color {
 }
 
 impl Color {
+    pub fn new(r: f64, g: f64, b: f64) -> Color {
+        Color { r, g, b }
+    }
     pub fn to_rgb(&self) -> Rgb<u8> {
         Rgb::from(self.to_slice())
     }
@@ -20,6 +23,14 @@ impl Color {
             (255.0 * self.g).max(0.0).min(255.0) as u8,
             (255.0 * self.b).max(0.0).min(255.0) as u8,
         ]
+    }
+
+    pub fn sqrt(&self) -> Color {
+        Color {
+            r: self.r.sqrt(),
+            g: self.g.sqrt(),
+            b: self.b.sqrt(),
+        }
     }
 }
 

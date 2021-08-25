@@ -1,4 +1,3 @@
-// use serde::{Deserialize, Deserializer};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Copy, Clone, Debug)]
@@ -9,6 +8,9 @@ pub struct Vec3 {
     pub z: f64,
 }
 impl Vec3 {
+    pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
+        Vec3 { x, y, z }
+    }
     pub fn zero() -> Vec3 {
         Vec3::from_one(0.0)
     }
@@ -52,6 +54,11 @@ impl Vec3 {
             y: self.z.abs(),
             z: self.x.abs(),
         }
+    }
+
+    pub fn near_zero(&self) -> bool {
+        const S: f64 = 1e-8;
+        self.x.abs() < S && self.y.abs() < S && self.z.abs() < S
     }
 }
 

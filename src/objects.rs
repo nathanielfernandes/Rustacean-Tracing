@@ -1,5 +1,3 @@
-extern crate image;
-
 //use crate::color::Color;
 use crate::materials::Material;
 use crate::ray::Ray;
@@ -10,46 +8,26 @@ pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
 }
-pub trait Tracable {
-    fn intersects(&self, ray: &Ray) -> Option<f64>;
+pub trait Intersectable {
+    fn intersects(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<f64>;
     fn surface_normal(&self, point: &Vec3) -> Vec3;
+    fn outward_normal(&self, point: &Vec3) -> Vec3;
 }
 
 impl Object {
-    // pub fn color(&self) -> Color {
-    //     match *self {
-    //         Object::Sphere(ref obj) => obj.color,
-    //         Object::Plane(ref obj) => obj.color,
-    //     }
-    // }
-
     pub fn material(&self) -> &Material {
         match *self {
             Object::Sphere(ref obj) => &obj.material,
             Object::Plane(ref obj) => &obj.material,
         }
     }
-
-    // pub fn albedo(&self) -> f64 {
-    //     match *self {
-    //         Object::Sphere(ref obj) => obj.albedo,
-    //         Object::Plane(ref obj) => obj.albedo,
-    //     }
-    // }
-
-    // pub fn reflectivity(&self) -> f64 {
-    //     match *self {
-    //         Object::Sphere(ref obj) => obj.reflectivity,
-    //         Object::Plane(ref obj) => obj.reflectivity,
-    //     }
-    // }
 }
 
-impl Tracable for Object {
-    fn intersects(&self, ray: &Ray) -> Option<f64> {
+impl Intersectable for Object {
+    fn intersects(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<f64> {
         match *self {
-            Object::Sphere(ref obj) => obj.intersects(ray),
-            Object::Plane(ref obj) => obj.intersects(ray),
+            Object::Sphere(ref obj) => obj.intersects(ray, t_min, t_max),
+            Object::Plane(ref obj) => obj.intersects(ray, t_min, t_max),
         }
     }
 
@@ -57,6 +35,13 @@ impl Tracable for Object {
         match *self {
             Object::Sphere(ref obj) => obj.surface_normal(point),
             Object::Plane(ref obj) => obj.surface_normal(point),
+        }
+    }
+
+    fn outward_normal(&self, point: &Vec3) -> Vec3 {
+        match *self {
+            Object::Sphere(ref obj) => obj.outward_normal(point),
+            Object::Plane(ref obj) => obj.outward_normal(point),
         }
     }
 }
@@ -77,35 +62,35 @@ impl Sphere {
     }
 }
 
-impl Tracable for Sphere {
-    fn intersects(&self, ray: &Ray) -> Option<f64> {
-        let line_segment = self.center - ray.origin;
-        let adjacent = line_segment.dot(&ray.direction);
-        let distance = line_segment.dot(&line_segment) - (adjacent * adjacent);
+impl Intersectable for Sphere {
+    fn intersects(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<f64> {
+        let oc = ray.origin - self.center;
+        let a = ray.direction.norm();
+        let half_b = oc.dot(&ray.direction);
+        let c = oc.norm() - self.radius * self.radius;
+        let discriminant = half_b * half_b - a * c;
 
-        let r2 = self.radius * self.radius;
-
-        if distance > r2 {
+        if discriminant < 0.0 {
             return None;
         }
 
-        let bounds = (r2 - distance).sqrt();
-        let t0 = adjacent - bounds;
-        let t1 = adjacent + bounds;
-
-        if t0 < 0.0 && t1 < 0.0 {
-            return None;
+        let sqrtd = discriminant.sqrt();
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || t_max < root {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || t_max < root {
+                return None;
+            }
         }
-
-        if t0 < t1 {
-            Some(t0)
-        } else {
-            Some(t1)
-        }
+        Some(root)
     }
 
     fn surface_normal(&self, point: &Vec3) -> Vec3 {
         (*point - self.center).normalize()
+    }
+
+    fn outward_normal(&self, point: &Vec3) -> Vec3 {
+        (*point - self.center) / self.radius
     }
 }
 
@@ -125,8 +110,10 @@ impl Plane {
     }
 }
 
-impl Tracable for Plane {
-    fn intersects(&self, ray: &Ray) -> Option<f64> {
+impl Intersectable for Plane {
+    fn intersects(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<f64> {
+        // remove
+        let _temp = (t_min, t_max);
         let denominator = self.normal.dot(&ray.direction);
         if denominator.abs() > 1e-6 {
             let difference = self.origin - ray.origin;
@@ -141,5 +128,10 @@ impl Tracable for Plane {
 
     fn surface_normal(&self, _point: &Vec3) -> Vec3 {
         -self.normal
+    }
+
+    fn outward_normal(&self, _point: &Vec3) -> Vec3 {
+        // implement ples
+        Vec3::zero()
     }
 }
