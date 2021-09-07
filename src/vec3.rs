@@ -60,6 +60,18 @@ impl Vec3 {
         const S: f64 = 1e-8;
         self.x.abs() < S && self.y.abs() < S && self.z.abs() < S
     }
+
+    pub fn to_vec(&self) -> Vec<f64> {
+        vec![self.x, self.y, self.z]
+    }
+
+    pub fn to_vec_f32(&self) -> Vec<f32> {
+        vec![
+            (self.x).max(-1.0).min(1.0) as f32,
+            (self.y).max(-1.0).min(1.0) as f32,
+            (self.z).max(-1.0).min(1.0) as f32,
+        ]
+    }
 }
 
 impl Add for Vec3 {

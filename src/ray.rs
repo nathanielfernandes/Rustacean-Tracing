@@ -10,11 +10,16 @@ use std::cmp::Ordering;
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
+    pub time: f64,
 }
 
 impl Ray {
-    pub fn new(origin: Vec3, direction: Vec3) -> Ray {
-        Ray { origin, direction }
+    pub fn new(origin: Vec3, direction: Vec3, time: f64) -> Ray {
+        Ray {
+            origin,
+            direction,
+            time,
+        }
     }
 
     pub fn front_face(&self, outward_normal: &Vec3) -> bool {
@@ -41,29 +46,58 @@ impl Ray {
             })
     }
 
-    pub fn color(&self, objects: &Vec<Object>, depth: u32) -> Color {
+    //    pub fn color(&self, objects: &Vec<Object>, depth: u32) -> Color {
+    pub fn color(&self, world: &Vec<Object>, background: &Color, depth: u32) -> Color {
         if depth <= 0 {
             return Color::new(0.0, 0.0, 0.0);
         }
 
-        match self.trace(objects, 0.001, ::std::f64::INFINITY) {
+        const TEMP_UV: (f64, f64) = (0.0, 0.0);
+
+        match self.trace(world, 0.001, ::std::f64::INFINITY) {
             Some(i) => {
                 let point = self.at(i.distance);
-                if let Some((attenuation, scattered)) =
-                    i.object.material().scatter(self, point, i.object)
-                {
-                    return attenuation * scattered.color(objects, depth - 1);
-                }
+                let mat = i.object.material();
+                let emitted = mat.emitted(TEMP_UV, point, i.object);
 
-                return Color::new(1.0, 1.0, 1.0);
+                return match mat.scatter(self, point, i.object) {
+                    Some((attenuation, scattered)) => {
+                        emitted + attenuation * scattered.color(world, background, depth - 1)
+                    }
+
+                    None => emitted,
+                };
+
+                //return Color::new(1.0, 1.0, 1.0);
                 // let target = point + random_hemisphere_distribution(surf_norm);
                 // let nr = Ray::new(point, target - point);
                 // 0.5 * nr.color(objects, depth - 1)
             }
             None => {
-                let t = 0.5 * (self.direction.normalize().y + 1.0);
-                (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+                *background
+                // let t = 0.5 * (self.direction.normalize().y + 1.0);
+                // (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
             }
+        }
+    }
+
+    pub fn buffer(&self, world: &Vec<Object>, background: &Color) -> (Vec<f32>, Vec<f32>) {
+        match self.trace(world, 0.001, ::std::f64::INFINITY) {
+            Some(i) => {
+                let point = self.at(i.distance);
+                let mat = i.object.material();
+                // let emitted = mat.emitted(TEMP_UV, point, i.object);
+                let normal = i.object.surface_normal(&point, self);
+
+                let outward_normal = i.object.outward_normal(&point, 0.0);
+                let uv = i.object.surface_uv(&outward_normal);
+
+                (
+                    mat.albedo(uv, outward_normal).to_vec_f32(),
+                    normal.to_vec_f32(),
+                )
+            }
+            None => (background.to_vec_f32(), Vec3::zero().to_vec_f32()),
         }
     }
 
@@ -97,3 +131,29 @@ impl Ray {
     //     }
     // }
 }
+
+// let obj = &world[0];
+
+// //let mut intersected_obj: Object;
+// match obj.intersects(self, 0.001, ::std::f64::INFINITY, world) {
+//     Some(i) => {
+//         //   println!("meep");
+//         let point = self.at(i.distance);
+
+//         let mat = i.object.material().unwrap();
+//         // if let Some(mat) = i.object.material() {
+//         if let Some((attenuation, scattered)) = mat.scatter(self, point, i.object) {
+//             return attenuation * scattered.color(world, depth - 1);
+//         }
+//         //}
+
+//         return Color::new(0.0, 0.0, 0.0);
+//         // let target = point + random_hemisphere_distribution(surf_norm);
+//         // let nr = Ray::new(point, target - point);
+//         // 0.5 * nr.color(objects, depth - 1)
+//     }
+//     None => {
+//         let t = 0.5 * (self.direction.normalize().y + 1.0);
+//         (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+//     }
+// }

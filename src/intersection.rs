@@ -1,5 +1,6 @@
 use crate::objects::Object;
 
+#[derive(Clone, Debug)]
 pub struct Intersection<'trace> {
     pub distance: f64,
     pub object: &'trace Object,

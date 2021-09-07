@@ -25,11 +25,27 @@ impl Color {
         ]
     }
 
+    pub fn to_vec_f32(&self) -> Vec<f32> {
+        vec![
+            (self.r).max(0.0).min(1.0) as f32,
+            (self.g).max(0.0).min(1.0) as f32,
+            (self.b).max(0.0).min(1.0) as f32,
+        ]
+    }
+
     pub fn sqrt(&self) -> Color {
         Color {
             r: self.r.sqrt(),
             g: self.g.sqrt(),
             b: self.b.sqrt(),
+        }
+    }
+
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Color {
+        Color {
+            r: r as f64 / 255.0,
+            g: g as f64 / 255.0,
+            b: b as f64 / 255.0,
         }
     }
 }
