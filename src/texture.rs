@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use crate::{color::Color, vec3::Vec3};
-use image::io::Reader as ImageReader;
 use image::{DynamicImage, GenericImageView};
 
 pub fn clamp(value: f64, lower: f64, upper: f64) -> f64 {
     value.min(upper).max(lower)
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Texture {
     SolidColor(SolidColor),
@@ -29,6 +29,7 @@ pub trait UvMappable {
     fn get_color_uv(&self, uv: (f64, f64), point: Vec3) -> Color;
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct SolidColor {
     color: Color,
@@ -46,6 +47,7 @@ impl UvMappable for SolidColor {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct CheckerBoard {
     color_1: Color,
@@ -76,6 +78,7 @@ impl UvMappable for CheckerBoard {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Image {
     img: Arc<DynamicImage>,

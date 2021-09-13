@@ -1,20 +1,21 @@
-use std::cell::RefCell;
-use std::cmp::Ordering;
+// use std::cell::RefCell;
+// use std::cmp::Ordering;
 use std::f32::consts::PI;
-use std::ptr::null;
+// use std::ptr::null;
 
-use crate::color::Color;
-use crate::intersection::Intersection;
+// use crate::color::Color;
+// use crate::intersection::Intersection;
 //use crate::color::Color;
-use crate::materials::{Lambertian, Material};
+use crate::materials::Material;
 use crate::ray::Ray;
 
-use crate::rendering::random_int;
-use crate::texture::SolidColor;
+// use crate::rendering::random_int;
+// use crate::texture::SolidColor;
 use crate::Vec3;
 
 const PI_F32: f64 = PI as f64;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Object {
     Sphere(Sphere),
@@ -99,7 +100,7 @@ impl Object {
     //     }
     // }
 }
-
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Sphere {
     pub center: Vec3,
@@ -162,7 +163,7 @@ impl Intersectable for Sphere {
     //     }
     // }
 }
-
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct MovingSphere {
     pub center_0: Vec3,
@@ -250,7 +251,7 @@ impl Intersectable for MovingSphere {
     //     AABB::surrounding_box(box_0, box_1)
     // }
 }
-
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum PlaneType {
     YZ,
@@ -258,6 +259,7 @@ pub enum PlaneType {
     XY,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Plane {
     plane_type: PlaneType,

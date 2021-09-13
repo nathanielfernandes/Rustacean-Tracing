@@ -1,10 +1,11 @@
 use crate::color::Color;
-use crate::objects::{Intersectable, Object};
+use crate::objects::Object;
 use crate::ray::Ray;
 use crate::rendering::{random_distribution, random_sphere_distribution};
 use crate::texture::Texture;
 use crate::vec3::Vec3;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Material {
     Labertian(Lambertian),
@@ -48,6 +49,7 @@ impl Tracable for Material {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Lambertian {
     pub texture: Texture,
@@ -85,6 +87,7 @@ impl Tracable for Lambertian {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Metal {
     pub texture: Texture,
@@ -131,6 +134,7 @@ impl Tracable for Metal {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Dielectric {
     pub ir: f64,
@@ -197,6 +201,7 @@ impl Tracable for Dielectric {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct EmissiveDiffuse {
     texture: Texture,

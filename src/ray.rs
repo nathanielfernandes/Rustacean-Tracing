@@ -1,6 +1,6 @@
 use crate::intersection::Intersection;
 use crate::materials::Tracable;
-use crate::objects::Intersectable;
+// use crate::objects::Intersectable;
 use crate::objects::Object;
 use crate::Color;
 use crate::Vec3;

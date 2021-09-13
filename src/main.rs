@@ -15,6 +15,7 @@ pub mod perlin;
 pub mod texture;
 pub mod vec3;
 use color::*;
+
 use materials::{Dielectric, EmissiveDiffuse, Lambertian, Metal};
 use objects::{create_box, MovingSphere, Object, Plane, PlaneType, Sphere};
 use rendering::Camera;
@@ -37,12 +38,14 @@ macro_rules! color {
     };
 }
 
+#[allow(dead_code)]
 enum Rotate {
     R90,
     R180,
     R270,
 }
 
+#[allow(dead_code)]
 fn load_image(image_path: &str, rotation: Rotate) -> Arc<DynamicImage> {
     let img = ImageReader::open(image_path).unwrap().decode().unwrap();
     Arc::new(match rotation {
