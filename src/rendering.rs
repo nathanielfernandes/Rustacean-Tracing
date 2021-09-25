@@ -1,3 +1,4 @@
+use crate::bvh::BvhTree;
 use crate::color::*;
 //use crate::intersection::Intersection;
 //use crate::objects::Intersectable;
@@ -14,19 +15,19 @@ use rayon::prelude::*;
 // /use std::cmp::Ordering;
 use std::time::Instant;
 
-// const BETWEEN: Uniform<f64> = Uniform::from(0.0_f64..1.0_f64);
+// const BETWEEN: Uniform<f32> = Uniform::from(0.0_f32..1.0_f32);
 
 pub fn random_int(i: u32, j: u32) -> u32 {
     let mut rng = rand::thread_rng();
     rng.gen_range(i..j)
 }
 
-pub fn random_float(i: f64, j: f64) -> f64 {
+pub fn random_float(i: f32, j: f32) -> f32 {
     let mut rng = rand::thread_rng();
     rng.gen_range(i..j)
 }
 
-pub fn random_distribution() -> f64 {
+pub fn random_distribution() -> f32 {
     rand::random()
     // let mut rng = rand::thread_rng();
     // BETWEEN.sample(&mut rng)
@@ -96,10 +97,10 @@ pub struct Camera {
     pub u: Vec3,
     pub v: Vec3,
     pub w: Vec3,
-    pub lens_radius: f64,
-    pub aspect_ratio: f64,
-    pub time_0: f64,
-    pub time_1: f64,
+    pub lens_radius: f32,
+    pub aspect_ratio: f32,
+    pub time_0: f32,
+    pub time_1: f32,
 }
 
 impl Camera {
@@ -107,12 +108,12 @@ impl Camera {
         lookfrom: Vec3,
         lookat: Vec3,
         vup: Vec3,
-        vfov: f64,
-        aspect_ratio: f64,
-        aperture: f64,
-        focus_dist: f64,
-        time_0: f64, // shutter open
-        time_1: f64, // shutter close
+        vfov: f32,
+        aspect_ratio: f32,
+        aperture: f32,
+        focus_dist: f32,
+        time_0: f32, // shutter open
+        time_1: f32, // shutter close
     ) -> Camera {
         let theta = vfov.to_radians();
         let h = (theta / 2.0).tan();
@@ -146,7 +147,7 @@ impl Camera {
         }
     }
 
-    pub fn get_ray(&self, s: f64, t: f64) -> Ray {
+    pub fn get_ray(&self, s: f32, t: f32) -> Ray {
         let rd = self.lens_radius * random_in_unit_disk();
         let offset = self.u * rd.x + self.v * rd.y;
 
@@ -166,7 +167,7 @@ impl Camera {
         samples_per_pixel: u32,
         max_depth: u32,
     ) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
-        let height = (width as f64 / self.aspect_ratio) as u32;
+        let height = (width as f32 / self.aspect_ratio) as u32;
 
         let mut img = RgbImage::new(width, height);
 
@@ -188,8 +189,8 @@ impl Camera {
                 let mut final_color = Color::new(0.0, 0.0, 0.0);
 
                 for _ in 0..samples_per_pixel {
-                    let u = (random_distribution() + x as f64) / (width - 1) as f64;
-                    let v = (random_distribution() + y as f64) / (height - 1) as f64;
+                    let u = (random_distribution() + x as f32) / (width - 1) as f32;
+                    let v = (random_distribution() + y as f32) / (height - 1) as f32;
 
                     let r = self.get_ray(u, v);
 
@@ -198,7 +199,7 @@ impl Camera {
                 img.put_pixel(
                     x,
                     height - 1 - y,
-                    (final_color / samples_per_pixel as f64).sqrt().to_rgb(),
+                    (final_color / samples_per_pixel as f32).sqrt().to_rgb(),
                 );
 
                 bar.inc(1);
@@ -209,14 +210,143 @@ impl Camera {
         println!("Took {:?}", t1.elapsed());
         img
     }
+    pub fn bvh_render(
+        &self,
+        world: &BvhTree,
+        background: &Color,
+        width: u32,
+        samples_per_pixel: u32,
+        max_depth: u32,
+        denoise_settings: Option<DenoiseSettings>,
+    ) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
+        let height = (width as f32 / self.aspect_ratio) as u32;
 
-    pub fn calculate_buffers(
+        let mut img = RgbImage::new(width, height);
+
+        let bar = &Box::new(ProgressBar::new((width * height / 64) as u64));
+        bar.set_prefix("Rendering");
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{prefix:.white} [{eta_precise}] {bar:40.cyan/blue} {percent}%"),
+        );
+        let start = Instant::now();
+
+        let pixels: Vec<u8> = (0..height)
+            .into_par_iter()
+            .rev()
+            .flat_map(|j| {
+                (0..width).into_par_iter().flat_map(move |i| {
+                    let mut col = Color::new(0.0, 0.0, 0.0);
+                    for _s in 0..samples_per_pixel {
+                        let u = ((i as f32) + rand::random::<f32>()) / (width as f32);
+                        let v = ((j as f32) + rand::random::<f32>()) / (height as f32);
+
+                        let r = self.get_ray(u, v);
+                        col = col + r.bvh_color(world, background, max_depth);
+                    }
+
+                    if i % 64 == 0 {
+                        bar.inc(1);
+                    }
+
+                    col = (col / samples_per_pixel as f32).sqrt();
+                    let v_col = col.to_vec_f32();
+                    (0..3)
+                        .into_par_iter()
+                        .map(move |k| (255.99 * v_col[k as usize]).min(255.0) as u8)
+                })
+            })
+            .collect();
+
+        bar.finish();
+
+        img.copy_from_slice(&pixels);
+
+        println!("Finished in {:?}", start.elapsed());
+
+        match denoise_settings {
+            Some(dns) => {
+                println!("Starting Denoising");
+                let (albedo_buffer, normal_buffer) =
+                    self.bvh_calculate_buffers(world, background, width);
+                dns.denoise(img, albedo_buffer, normal_buffer)
+            }
+            None => img,
+        }
+    }
+
+    pub fn pog_render(
         &self,
         world: &Vec<Object>,
         background: &Color,
         width: u32,
+        samples_per_pixel: u32,
+        max_depth: u32,
+        denoise_settings: Option<DenoiseSettings>,
+    ) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
+        let height = (width as f32 / self.aspect_ratio) as u32;
+
+        let mut img = RgbImage::new(width, height);
+
+        let bar = &Box::new(ProgressBar::new((width * height / 64) as u64));
+        bar.set_prefix("Rendering");
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{prefix:.white} [{eta_precise}] {bar:40.cyan/blue} {percent}%"),
+        );
+        let start = Instant::now();
+
+        let pixels: Vec<u8> = (0..height)
+            .into_par_iter()
+            .rev()
+            .flat_map(|j| {
+                (0..width).into_par_iter().flat_map(move |i| {
+                    let mut col = Color::new(0.0, 0.0, 0.0);
+                    for _s in 0..samples_per_pixel {
+                        let u = ((i as f32) + rand::random::<f32>()) / (width as f32);
+                        let v = ((j as f32) + rand::random::<f32>()) / (height as f32);
+
+                        let r = self.get_ray(u, v);
+                        col = col + r.color(world, background, max_depth);
+                    }
+
+                    if i % 64 == 0 {
+                        bar.inc(1);
+                    }
+
+                    col = (col / samples_per_pixel as f32).sqrt();
+                    let v_col = col.to_vec_f32();
+                    (0..3)
+                        .into_par_iter()
+                        .map(move |k| (255.99 * v_col[k as usize]).min(255.0) as u8)
+                })
+            })
+            .collect();
+
+        bar.finish();
+
+        img.copy_from_slice(&pixels);
+
+        println!("Finished in {:?}", start.elapsed());
+
+        match denoise_settings {
+            Some(dns) => {
+                println!("Starting Denoising");
+                let (albedo_buffer, normal_buffer) =
+                    self.calculate_buffers(world, background, width);
+                dns.denoise(img, albedo_buffer, normal_buffer)
+            }
+            None => img,
+        }
+    }
+
+    pub fn bvh_calculate_buffers(
+        &self,
+        world: &BvhTree,
+        background: &Color,
+        width: u32,
     ) -> (Vec<f32>, Vec<f32>) {
-        let height = (width as f64 / self.aspect_ratio) as u32;
+        let height = (width as f32 / self.aspect_ratio) as u32;
 
         let bar = ProgressBar::new((width * height) as u64);
 
@@ -234,8 +364,52 @@ impl Camera {
 
         for y in 0..height {
             for x in 0..width {
-                let u = x as f64 / (width - 1) as f64;
-                let v = (height - 1 - y) as f64 / (height - 1) as f64;
+                let u = x as f32 / (width - 1) as f32;
+                let v = (height - 1 - y) as f32 / (height - 1) as f32;
+                let r = self.get_ray(u, v);
+
+                let (albedo, normal) = r.bvh_buffer(world, background);
+                (albedo).into_iter().for_each(|a| albedo_buffer.push(a));
+                (normal).into_iter().for_each(|n| normal_buffer.push(n));
+                //  albedo_buffer.copy_from_slice(&albedo);
+                //normal_buffer.copy_from_slice(&normal);
+
+                bar.inc(1);
+            }
+        }
+
+        bar.finish();
+        println!("Took {:?}", t1.elapsed());
+
+        (albedo_buffer, normal_buffer)
+    }
+
+    pub fn calculate_buffers(
+        &self,
+        world: &Vec<Object>,
+        background: &Color,
+        width: u32,
+    ) -> (Vec<f32>, Vec<f32>) {
+        let height = (width as f32 / self.aspect_ratio) as u32;
+
+        let bar = ProgressBar::new((width * height) as u64);
+
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:50.yellow/yellow} {pos:>7}/{len:7} pixels"),
+        );
+
+        println!("Rendering Buffers {}x{}", width, height);
+
+        let t1 = Instant::now();
+
+        let mut normal_buffer: Vec<f32> = Vec::new();
+        let mut albedo_buffer: Vec<f32> = Vec::new();
+
+        for y in 0..height {
+            for x in 0..width {
+                let u = x as f32 / (width - 1) as f32;
+                let v = (height - 1 - y) as f32 / (height - 1) as f32;
                 let r = self.get_ray(u, v);
 
                 let (albedo, normal) = r.buffer(world, background);
@@ -263,7 +437,7 @@ impl Camera {
         ImageBuffer<image::Rgb<u8>, Vec<u8>>,
         ImageBuffer<image::Rgb<u8>, Vec<u8>>,
     ) {
-        let height = (width as f64 / self.aspect_ratio) as u32;
+        let height = (width as f32 / self.aspect_ratio) as u32;
 
         let mut normals = RgbImage::new(width, height);
         let mut albedos = RgbImage::new(width, height);
@@ -284,11 +458,82 @@ impl Camera {
 
         for y in 0..height {
             for x in 0..width {
-                let u = x as f64 / (width - 1) as f64;
-                let v = y as f64 / (height - 1) as f64;
+                let u = x as f32 / (width - 1) as f32;
+                let v = y as f32 / (height - 1) as f32;
                 let r = self.get_ray(u, v);
 
                 let (albedo, normal) = r.buffer(world, background);
+
+                albedos.put_pixel(
+                    x,
+                    height - 1 - y,
+                    Rgb::from([
+                        (albedo[0] * 255.0) as u8,
+                        (albedo[1] * 255.0) as u8,
+                        (albedo[2] * 255.0) as u8,
+                    ]),
+                );
+
+                normals.put_pixel(
+                    x,
+                    height - 1 - y,
+                    Rgb::from([
+                        (0.5 * ((normal[0] + 1.0) * 255.0)) as u8,
+                        (0.5 * ((normal[1] + 1.0) * 255.0)) as u8,
+                        (0.5 * ((normal[2] + 1.0) * 255.0)) as u8,
+                    ]),
+                );
+
+                // (albedo).into_iter().for_each(|a| albedo_buffer.push(a));
+                // (normal).into_iter().for_each(|n| normal_buffer.push(n));
+                //  albedo_buffer.copy_from_slice(&albedo);
+                //normal_buffer.copy_from_slice(&normal);
+
+                bar.inc(1);
+            }
+        }
+
+        bar.finish();
+        println!("Took {:?}", t1.elapsed());
+
+        (albedos, normals)
+    }
+
+    pub fn bvh_render_buffers(
+        &self,
+        world: &BvhTree,
+        background: &Color,
+        width: u32,
+    ) -> (
+        ImageBuffer<image::Rgb<u8>, Vec<u8>>,
+        ImageBuffer<image::Rgb<u8>, Vec<u8>>,
+    ) {
+        let height = (width as f32 / self.aspect_ratio) as u32;
+
+        let mut normals = RgbImage::new(width, height);
+        let mut albedos = RgbImage::new(width, height);
+
+        let bar = ProgressBar::new((width * height) as u64);
+
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:50.yellow/yellow} {pos:>7}/{len:7} pixels"),
+        );
+
+        println!("Rendering Buffers {}x{}", width, height);
+
+        let t1 = Instant::now();
+
+        // let mut normal_buffer: Vec<f32> = Vec::new();
+        // let mut albedo_buffer: Vec<f32> = Vec::new();
+
+        for y in 0..height {
+            for x in 0..width {
+                let u = x as f32 / (width - 1) as f32;
+                let v = y as f32 / (height - 1) as f32;
+                let r = self.get_ray(u, v);
+
+                let (albedo, normal) = r.bvh_buffer(world, background);
 
                 albedos.put_pixel(
                     x,
@@ -333,7 +578,7 @@ impl Camera {
         samples_per_pixel: u32,
         max_depth: u32,
     ) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
-        let height = (width as f64 / self.aspect_ratio) as u32;
+        let height = (width as f32 / self.aspect_ratio) as u32;
         let mut img = RgbImage::new(width, height);
 
         let bar = ProgressBar::new((height * width) as u64 + 1);
@@ -352,14 +597,14 @@ impl Camera {
             let mut final_color = Color::new(0.0, 0.0, 0.0);
 
             (0..samples_per_pixel).for_each(|_| {
-                let u = (random_distribution() + (i as u32 % width) as f64) / (width - 1) as f64;
-                let v = (random_distribution() + (i as u32 / width) as f64) / (height - 1) as f64;
+                let u = (random_distribution() + (i as u32 % width) as f32) / (width - 1) as f32;
+                let v = (random_distribution() + (i as u32 / width) as f32) / (height - 1) as f32;
 
                 let r = self.get_ray(u, v);
 
                 final_color = final_color + r.color(objects, background, max_depth);
             });
-            slab.copy_from_slice(&(final_color / samples_per_pixel as f64).sqrt().to_slice());
+            slab.copy_from_slice(&(final_color / samples_per_pixel as f32).sqrt().to_slice());
 
             bar.inc(1);
         });
@@ -381,7 +626,7 @@ impl Camera {
         max_depth: u32,
         denoise_settings: Option<DenoiseSettings>,
     ) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
-        let height = (width as f64 / self.aspect_ratio) as u32;
+        let height = (width as f32 / self.aspect_ratio) as u32;
         let chunk_size = width * 3 * row_h;
 
         let mut img = RgbImage::new(width, height);
@@ -450,8 +695,8 @@ impl Camera {
                 let mut final_color = Color::new(0.0, 0.0, 0.0);
 
                 (0..samples_per_pixel).for_each(|_| {
-                    let u = (random_distribution() + x as f64) / (width - 1) as f64;
-                    let v = (random_distribution() + y as f64) / (height - 1) as f64;
+                    let u = (random_distribution() + x as f32) / (width - 1) as f32;
+                    let v = (random_distribution() + y as f32) / (height - 1) as f32;
 
                     let r = self.get_ray(u, v);
 
@@ -459,7 +704,7 @@ impl Camera {
                 });
 
                 pixels
-                    .extend_from_slice(&(final_color / samples_per_pixel as f64).sqrt().to_slice());
+                    .extend_from_slice(&(final_color / samples_per_pixel as f32).sqrt().to_slice());
             }
         }
         pixels

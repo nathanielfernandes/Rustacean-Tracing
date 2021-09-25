@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{color::Color, vec3::Vec3};
 use image::{DynamicImage, GenericImageView};
 
-pub fn clamp(value: f64, lower: f64, upper: f64) -> f64 {
+pub fn clamp(value: f32, lower: f32, upper: f32) -> f32 {
     value.min(upper).max(lower)
 }
 
@@ -16,7 +16,7 @@ pub enum Texture {
 }
 
 impl Texture {
-    pub fn get_color_uv(&self, uv: (f64, f64), point: Vec3) -> Color {
+    pub fn get_color_uv(&self, uv: (f32, f32), point: Vec3) -> Color {
         match *self {
             Texture::SolidColor(ref tex) => tex.get_color_uv(uv, point),
             Texture::CheckerBoard(ref tex) => tex.get_color_uv(uv, point), //Texture::(ref obj) => obj.outward_normal(point, time),
@@ -26,7 +26,7 @@ impl Texture {
 }
 
 pub trait UvMappable {
-    fn get_color_uv(&self, uv: (f64, f64), point: Vec3) -> Color;
+    fn get_color_uv(&self, uv: (f32, f32), point: Vec3) -> Color;
 }
 
 #[allow(dead_code)]
@@ -42,7 +42,7 @@ impl SolidColor {
 }
 
 impl UvMappable for SolidColor {
-    fn get_color_uv(&self, _uv: (f64, f64), _point: Vec3) -> Color {
+    fn get_color_uv(&self, _uv: (f32, f32), _point: Vec3) -> Color {
         self.color
     }
 }
@@ -52,11 +52,11 @@ impl UvMappable for SolidColor {
 pub struct CheckerBoard {
     color_1: Color,
     color_2: Color,
-    scale: f64,
+    scale: f32,
 }
 
 impl CheckerBoard {
-    pub fn new(color_1: Color, color_2: Color, scale: f64) -> Texture {
+    pub fn new(color_1: Color, color_2: Color, scale: f32) -> Texture {
         Texture::CheckerBoard(CheckerBoard {
             color_1,
             color_2,
@@ -66,7 +66,7 @@ impl CheckerBoard {
 }
 
 impl UvMappable for CheckerBoard {
-    fn get_color_uv(&self, _uv: (f64, f64), point: Vec3) -> Color {
+    fn get_color_uv(&self, _uv: (f32, f32), point: Vec3) -> Color {
         let sin_v = (self.scale * point.x).sin()
             * (self.scale * point.y).sin()
             * (self.scale * point.z).sin();
@@ -96,17 +96,17 @@ impl Image {
 }
 
 impl UvMappable for Image {
-    fn get_color_uv(&self, uv: (f64, f64), _point: Vec3) -> Color {
+    fn get_color_uv(&self, uv: (f32, f32), _point: Vec3) -> Color {
         let u = clamp(uv.0, 0.0, 1.0);
         let v = 1.0 - clamp(uv.1, 0.0, 1.0);
 
-        let mut i = (u * self.width as f64) as u32;
-        let mut j = (v * self.height as f64) as u32;
+        let mut i = (u * self.width as f32) as u32;
+        let mut j = (v * self.height as f32) as u32;
 
         i = if i >= self.width { self.width - 1 } else { i };
         j = if j >= self.height { self.height - 1 } else { j };
 
-        // const color_scale: f64 = 1.0 / 255.0;
+        // const color_scale: f32 = 1.0 / 255.0;
 
         let pixel = self.img.get_pixel(j, i);
 

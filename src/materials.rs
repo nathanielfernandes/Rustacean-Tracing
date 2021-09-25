@@ -16,8 +16,8 @@ pub enum Material {
 
 pub trait Tracable {
     fn scatter(&self, ray: &Ray, point: Vec3, object: &Object) -> Option<(Color, Ray)>;
-    fn emitted(&self, uv: (f64, f64), point: Vec3, object: &Object) -> Color;
-    fn albedo(&self, uv: (f64, f64), point: Vec3) -> Color;
+    fn emitted(&self, uv: (f32, f32), point: Vec3, object: &Object) -> Color;
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color;
 }
 
 impl Tracable for Material {
@@ -30,7 +30,7 @@ impl Tracable for Material {
         }
     }
 
-    fn emitted(&self, uv: (f64, f64), point: Vec3, object: &Object) -> Color {
+    fn emitted(&self, uv: (f32, f32), point: Vec3, object: &Object) -> Color {
         match *self {
             Material::Labertian(ref mat) => mat.emitted(uv, point, object),
             Material::Metal(ref mat) => mat.emitted(uv, point, object),
@@ -39,7 +39,7 @@ impl Tracable for Material {
         }
     }
 
-    fn albedo(&self, uv: (f64, f64), point: Vec3) -> Color {
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
         match *self {
             Material::Labertian(ref mat) => mat.albedo(uv, point),
             Material::Metal(ref mat) => mat.albedo(uv, point),
@@ -78,11 +78,11 @@ impl Tracable for Lambertian {
         ))
     }
 
-    fn emitted(&self, _uv: (f64, f64), _point: Vec3, _object: &Object) -> Color {
+    fn emitted(&self, _uv: (f32, f32), _point: Vec3, _object: &Object) -> Color {
         Color::new(0.0, 0.0, 0.0)
     }
 
-    fn albedo(&self, uv: (f64, f64), point: Vec3) -> Color {
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
         self.texture.get_color_uv(uv, point)
     }
 }
@@ -91,11 +91,11 @@ impl Tracable for Lambertian {
 #[derive(Clone, Debug)]
 pub struct Metal {
     pub texture: Texture,
-    pub fuzz: f64,
+    pub fuzz: f32,
 }
 
 impl Metal {
-    pub fn new(texture: Texture, fuzz: f64) -> Material {
+    pub fn new(texture: Texture, fuzz: f32) -> Material {
         Material::Metal(Metal { texture, fuzz })
     }
 
@@ -125,11 +125,11 @@ impl Tracable for Metal {
         }
     }
 
-    fn emitted(&self, _uv: (f64, f64), _point: Vec3, _object: &Object) -> Color {
+    fn emitted(&self, _uv: (f32, f32), _point: Vec3, _object: &Object) -> Color {
         Color::new(0.0, 0.0, 0.0)
     }
 
-    fn albedo(&self, uv: (f64, f64), point: Vec3) -> Color {
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
         self.texture.get_color_uv(uv, point)
     }
 }
@@ -137,24 +137,24 @@ impl Tracable for Metal {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Dielectric {
-    pub ir: f64,
+    pub ir: f32,
 }
 
 impl Dielectric {
-    pub fn new(index_of_refraction: f64) -> Material {
+    pub fn new(index_of_refraction: f32) -> Material {
         Material::Dielectric(Dielectric {
             ir: index_of_refraction,
         })
     }
 
-    pub fn refract(uv: Vec3, normal: Vec3, etai_over_etat: f64) -> Vec3 {
+    pub fn refract(uv: Vec3, normal: Vec3, etai_over_etat: f32) -> Vec3 {
         let cos_theta = (-uv).dot(&normal).min(1.0);
         let r_out_perp = etai_over_etat * (uv + cos_theta * normal);
         let r_our_parallel = -((1.0 - r_out_perp.norm()).abs().sqrt()) * normal;
         r_out_perp + r_our_parallel
     }
 
-    pub fn reflectance(cosine: f64, ref_idx: f64) -> f64 {
+    pub fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
         let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
         r0 *= r0;
         r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
@@ -192,11 +192,11 @@ impl Tracable for Dielectric {
         Some((attenuation, Ray::new(point, direction, ray.time)))
     }
 
-    fn emitted(&self, _uv: (f64, f64), _point: Vec3, _object: &Object) -> Color {
+    fn emitted(&self, _uv: (f32, f32), _point: Vec3, _object: &Object) -> Color {
         Color::new(0.0, 0.0, 0.0)
     }
 
-    fn albedo(&self, _uv: (f64, f64), _point: Vec3) -> Color {
+    fn albedo(&self, _uv: (f32, f32), _point: Vec3) -> Color {
         Color::new(0.0, 0.0, 0.0)
     }
 }
@@ -218,13 +218,13 @@ impl Tracable for EmissiveDiffuse {
         None
     }
 
-    fn emitted(&self, _uv: (f64, f64), point: Vec3, object: &Object) -> Color {
+    fn emitted(&self, _uv: (f32, f32), point: Vec3, object: &Object) -> Color {
         let outward_normal = object.outward_normal(&point, 0.0);
         let uv = object.surface_uv(&outward_normal);
         self.texture.get_color_uv(uv, point)
     }
 
-    fn albedo(&self, uv: (f64, f64), point: Vec3) -> Color {
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
         self.texture.get_color_uv(uv, point)
     }
 }
