@@ -9,13 +9,14 @@ pub struct Aabb {
 
 impl Aabb {
     pub fn hit(&self, r: &Ray, mut tmin: f32, mut tmax: f32) -> bool {
-        let r_dir = r.direction.to_vec();
-        let r_origin = r.origin.to_vec();
-        let (minn, maxx) = (self.min.to_vec(), self.max.to_vec());
+        // switched to indexing vec
+        // let r_dir = r.direction.to_vec();
+        // let r_origin = r.origin.to_vec();
+        // let (minn, maxx) = (self.min.to_vec(), self.max.to_vec());
 
         for a in 0..3 {
-            let mint = (minn[a] - r_origin[a]) / r_dir[a];
-            let maxt = (maxx[a] - r_origin[a]) / r_dir[a];
+            let mint = (self.min[a] - r.origin[a]) / r.direction[a];
+            let maxt = (self.max[a] - r.origin[a]) / r.direction[a];
             let t0 = ffmin(mint, maxt);
             let t1 = ffmax(mint, maxt);
 

@@ -33,11 +33,7 @@ impl<'a> BvhTree<'a> {
 
         if node.aabb.is_none() || node.aabb.is_some() && node.aabb.unwrap().hit(r, tmin, tmax) {
             match node.object {
-                Some(ref object) => {
-                    if let Some(d) = object.intersects(r, tmin, tmax) {
-                        return Some(Intersection::new(d, &object));
-                    }
-                }
+                Some(ref object) => return object.intersects(r, tmin, tmax),
                 None => {}
             }
 

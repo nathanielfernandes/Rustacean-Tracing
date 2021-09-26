@@ -186,7 +186,7 @@ impl Camera {
 
         for y in 0..height {
             for x in 0..width {
-                let mut final_color = Color::new(0.0, 0.0, 0.0);
+                let mut final_color = BLACK;
 
                 for _ in 0..samples_per_pixel {
                     let u = (random_distribution() + x as f32) / (width - 1) as f32;
@@ -236,7 +236,8 @@ impl Camera {
             .rev()
             .flat_map(|j| {
                 (0..width).into_par_iter().flat_map(move |i| {
-                    let mut col = Color::new(0.0, 0.0, 0.0);
+                    let mut col = BLACK;
+
                     for _s in 0..samples_per_pixel {
                         let u = ((i as f32) + rand::random::<f32>()) / (width as f32);
                         let v = ((j as f32) + rand::random::<f32>()) / (height as f32);
@@ -261,7 +262,7 @@ impl Camera {
         bar.finish();
 
         img.copy_from_slice(&pixels);
-
+        img.save("regular.png").unwrap();
         println!("Finished in {:?}", start.elapsed());
 
         match denoise_settings {
@@ -301,7 +302,7 @@ impl Camera {
             .rev()
             .flat_map(|j| {
                 (0..width).into_par_iter().flat_map(move |i| {
-                    let mut col = Color::new(0.0, 0.0, 0.0);
+                    let mut col = BLACK;
                     for _s in 0..samples_per_pixel {
                         let u = ((i as f32) + rand::random::<f32>()) / (width as f32);
                         let v = ((j as f32) + rand::random::<f32>()) / (height as f32);
@@ -594,7 +595,7 @@ impl Camera {
         let t1 = Instant::now();
 
         img.par_chunks_mut(3).enumerate().for_each(|(i, slab)| {
-            let mut final_color = Color::new(0.0, 0.0, 0.0);
+            let mut final_color = BLACK;
 
             (0..samples_per_pixel).for_each(|_| {
                 let u = (random_distribution() + (i as u32 % width) as f32) / (width - 1) as f32;
@@ -692,7 +693,7 @@ impl Camera {
         let mut pixels: Vec<u8> = Vec::new();
         for y in j..(j + h) {
             for x in 0..width {
-                let mut final_color = Color::new(0.0, 0.0, 0.0);
+                let mut final_color = BLACK;
 
                 (0..samples_per_pixel).for_each(|_| {
                     let u = (random_distribution() + x as f32) / (width - 1) as f32;

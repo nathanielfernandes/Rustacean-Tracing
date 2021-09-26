@@ -1,4 +1,5 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use core::panic;
+use std::ops::{Add, Div, Index, IndexMut, Mul, Neg, Sub};
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -170,6 +171,54 @@ impl Neg for Vec3 {
             x: -self.x,
             y: -self.y,
             z: -self.z,
+        }
+    }
+}
+
+impl Index<&'_ usize> for Vec3 {
+    type Output = f32;
+
+    fn index(&self, i: &usize) -> &f32 {
+        match i {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => &0.0,
+        }
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f32;
+
+    fn index(&self, i: usize) -> &f32 {
+        match i {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("index out of bounds!: {}", i),
+        }
+    }
+}
+
+impl IndexMut<&'_ usize> for Vec3 {
+    fn index_mut(&mut self, i: &usize) -> &mut f32 {
+        match i {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("index out of bounds!: {}", i),
+        }
+    }
+}
+
+impl IndexMut<usize> for Vec3 {
+    fn index_mut(&mut self, i: usize) -> &mut f32 {
+        match i {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("index out of bounds!: {}", i),
         }
     }
 }

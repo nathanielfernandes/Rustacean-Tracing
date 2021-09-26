@@ -1,4 +1,5 @@
-use crate::color::Color;
+use crate::color::{Color, BLACK, WHITE};
+use crate::intersection::Intersection;
 use crate::objects::Object;
 use crate::ray::Ray;
 use crate::rendering::{random_distribution, random_sphere_distribution};
@@ -6,36 +7,39 @@ use crate::texture::Texture;
 use crate::vec3::Vec3;
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Material {
     Labertian(Lambertian),
     Metal(Metal),
     Dielectric(Dielectric),
     EmissiveDiffuse(EmissiveDiffuse),
+    Isotropic(Isotropic),
 }
 
 pub trait Tracable {
-    fn scatter(&self, ray: &Ray, point: Vec3, object: &Object) -> Option<(Color, Ray)>;
-    fn emitted(&self, uv: (f32, f32), point: Vec3, object: &Object) -> Color;
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)>;
+    fn emitted(&self, uv: (f32, f32), inter: &Intersection) -> Color;
     fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color;
 }
 
 impl Tracable for Material {
-    fn scatter(&self, ray: &Ray, point: Vec3, object: &Object) -> Option<(Color, Ray)> {
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
         match *self {
-            Material::Labertian(ref mat) => mat.scatter(ray, point, object),
-            Material::Metal(ref mat) => mat.scatter(ray, point, object),
-            Material::Dielectric(ref mat) => mat.scatter(ray, point, object),
-            Material::EmissiveDiffuse(ref mat) => mat.scatter(ray, point, object),
+            Material::Labertian(ref mat) => mat.scatter(ray, inter),
+            Material::Metal(ref mat) => mat.scatter(ray, inter),
+            Material::Dielectric(ref mat) => mat.scatter(ray, inter),
+            Material::EmissiveDiffuse(ref mat) => mat.scatter(ray, inter),
+            Material::Isotropic(ref mat) => mat.scatter(ray, inter),
         }
     }
 
-    fn emitted(&self, uv: (f32, f32), point: Vec3, object: &Object) -> Color {
+    fn emitted(&self, uv: (f32, f32), inter: &Intersection) -> Color {
         match *self {
-            Material::Labertian(ref mat) => mat.emitted(uv, point, object),
-            Material::Metal(ref mat) => mat.emitted(uv, point, object),
-            Material::Dielectric(ref mat) => mat.emitted(uv, point, object),
-            Material::EmissiveDiffuse(ref mat) => mat.emitted(uv, point, object),
+            Material::Labertian(ref _mat) => BLACK, // mat.emitted(uv, inter),
+            Material::Metal(ref _mat) => BLACK,     //mat.emitted(uv, inter),
+            Material::Dielectric(ref _mat) => BLACK, //mat.emitted(uv, inter),
+            Material::EmissiveDiffuse(ref mat) => mat.emitted(uv, inter),
+            Material::Isotropic(ref _mat) => BLACK, //mat.emitted(uv, inter),
         }
     }
 
@@ -43,14 +47,15 @@ impl Tracable for Material {
         match *self {
             Material::Labertian(ref mat) => mat.albedo(uv, point),
             Material::Metal(ref mat) => mat.albedo(uv, point),
-            Material::Dielectric(ref mat) => mat.albedo(uv, point),
+            Material::Dielectric(ref mat) => BLACK, //mat.albedo(uv, point),
             Material::EmissiveDiffuse(ref mat) => mat.albedo(uv, point),
+            Material::Isotropic(ref mat) => mat.albedo(uv, point),
         }
     }
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Lambertian {
     pub texture: Texture,
 }
@@ -62,24 +67,24 @@ impl Lambertian {
 }
 
 impl Tracable for Lambertian {
-    fn scatter(&self, ray: &Ray, point: Vec3, object: &Object) -> Option<(Color, Ray)> {
-        let normal = object.surface_normal(&point, ray);
-        let mut scatter_dir = normal + random_sphere_distribution().normalize();
-        let outward_normal = object.outward_normal(&point, 0.0);
-        let uv = object.surface_uv(&outward_normal);
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
+        let normal = inter.normal;
+        let mut scatter_dir = inter.point + normal + random_sphere_distribution().normalize();
+        // let outward_normal = inter.outward_normal;
+        let uv = inter.uv;
 
         if scatter_dir.near_zero() {
             scatter_dir = normal;
         }
 
         Some((
-            self.texture.get_color_uv(uv, point),
-            Ray::new(point, scatter_dir, ray.time),
+            self.texture.get_color_uv(uv, inter.point),
+            Ray::new(inter.point, scatter_dir - inter.point, ray.time),
         ))
     }
 
-    fn emitted(&self, _uv: (f32, f32), _point: Vec3, _object: &Object) -> Color {
-        Color::new(0.0, 0.0, 0.0)
+    fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
+        BLACK
     }
 
     fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
@@ -88,7 +93,7 @@ impl Tracable for Lambertian {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Metal {
     pub texture: Texture,
     pub fuzz: f32,
@@ -105,17 +110,17 @@ impl Metal {
 }
 
 impl Tracable for Metal {
-    fn scatter(&self, ray: &Ray, point: Vec3, object: &Object) -> Option<(Color, Ray)> {
-        let normal = object.surface_normal(&point, ray);
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
+        let normal = inter.normal;
         let reflected = Metal::reflect(ray.direction.normalize(), normal);
-        let outward_normal = object.outward_normal(&point, 0.0);
-        let uv = object.surface_uv(&outward_normal);
+        // let outward_normal = inter.outward_normal;
+        let uv = inter.uv;
 
         if reflected.dot(&normal) > 0.0 {
             Some((
-                self.texture.get_color_uv(uv, point),
+                self.texture.get_color_uv(uv, inter.point),
                 Ray::new(
-                    point,
+                    inter.point,
                     reflected + self.fuzz * random_sphere_distribution().normalize(),
                     ray.time,
                 ),
@@ -125,8 +130,8 @@ impl Tracable for Metal {
         }
     }
 
-    fn emitted(&self, _uv: (f32, f32), _point: Vec3, _object: &Object) -> Color {
-        Color::new(0.0, 0.0, 0.0)
+    fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
+        BLACK
     }
 
     fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
@@ -135,7 +140,7 @@ impl Tracable for Metal {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Dielectric {
     pub ir: f32,
 }
@@ -162,11 +167,11 @@ impl Dielectric {
 }
 
 impl Tracable for Dielectric {
-    fn scatter(&self, ray: &Ray, point: Vec3, object: &Object) -> Option<(Color, Ray)> {
-        let outward_norm = object.outward_normal(&point, ray.time);
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
+        let outward_norm = inter.outward_normal;
         let normal;
 
-        let attenuation = Color::new(1.0, 1.0, 1.0);
+        let attenuation = WHITE;
         let refraction_r;
 
         if ray.front_face(&outward_norm) {
@@ -189,20 +194,20 @@ impl Tracable for Dielectric {
         } else {
             Dielectric::refract(unit_direction, normal, refraction_r)
         };
-        Some((attenuation, Ray::new(point, direction, ray.time)))
+        Some((attenuation, Ray::new(inter.point, direction, ray.time)))
     }
 
-    fn emitted(&self, _uv: (f32, f32), _point: Vec3, _object: &Object) -> Color {
-        Color::new(0.0, 0.0, 0.0)
+    fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
+        BLACK
     }
 
     fn albedo(&self, _uv: (f32, f32), _point: Vec3) -> Color {
-        Color::new(0.0, 0.0, 0.0)
+        BLACK
     }
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct EmissiveDiffuse {
     texture: Texture,
 }
@@ -214,17 +219,92 @@ impl EmissiveDiffuse {
 }
 
 impl Tracable for EmissiveDiffuse {
-    fn scatter(&self, _ray: &Ray, _point: Vec3, _object: &Object) -> Option<(Color, Ray)> {
+    fn scatter(&self, _ray: &Ray, _inter: &Intersection) -> Option<(Color, Ray)> {
         None
     }
 
-    fn emitted(&self, _uv: (f32, f32), point: Vec3, object: &Object) -> Color {
-        let outward_normal = object.outward_normal(&point, 0.0);
-        let uv = object.surface_uv(&outward_normal);
-        self.texture.get_color_uv(uv, point)
+    fn emitted(&self, _uv: (f32, f32), inter: &Intersection) -> Color {
+        // let outward_normal = inter.outward_normal;
+        let uv = inter.uv;
+        self.texture.get_color_uv(uv, inter.point)
     }
 
     fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
         self.texture.get_color_uv(uv, point)
     }
 }
+
+#[allow(dead_code)]
+#[derive(Copy, Clone, Debug)]
+pub struct Isotropic {
+    texture: Texture,
+}
+
+impl Isotropic {
+    pub fn new(texture: Texture) -> Material {
+        Material::Isotropic(Isotropic { texture })
+    }
+}
+
+impl Tracable for Isotropic {
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
+        Some((
+            self.albedo(inter.uv, inter.point),
+            Ray::new(
+                inter.point,
+                random_sphere_distribution().normalize(),
+                ray.time,
+            ),
+        ))
+    }
+
+    fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
+        // let outward_normal = inter.outward_normal;
+        // let uv = inter.uv;
+        // self.texture.get_color_uv(uv, inter.point)
+        BLACK
+    }
+
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
+        self.texture.get_color_uv(uv, point)
+    }
+}
+
+// #[allow(dead_code)]
+// #[derive(Copy, Clone, Debug)]
+// pub struct Reflective {
+//     texture: Texture,
+// }
+
+// impl Reflective {
+//     pub fn new(texture: Texture) -> Material {
+//         Material::Isotropic(Isotropic { texture })
+//     }
+// }
+
+// impl Tracable for Reflective {
+//     fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
+//         let normal = inter.normal;
+
+//         let reflected = Metal::reflect(ray.direction.normalize(), normal);
+//         // let outward_normal = inter.outward_normal;
+//         let uv = inter.uv;
+
+//         if reflected.dot(&normal) > 0.0 {
+//             Some((
+//                 self.texture.get_color_uv(uv, inter.point),
+//                 Ray::new(inter.point, reflected, ray.time),
+//             ))
+//         } else {
+//             None
+//         }
+//     }
+
+//     fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
+//         Color::new(0.0, 0.0, 0.0)
+//     }
+
+//     fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
+//         self.texture.get_color_uv(uv, point)
+//     }
+// }
