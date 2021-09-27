@@ -1,89 +1,266 @@
-use crate::Scene;
+use crate::bvh::BvhTree;
+use crate::color::BLACK;
+use crate::intersection;
+use crate::intersection::Intersection;
+use crate::materials::Tracable;
+// use crate::objects::Intersectable;
+use crate::objects::Object;
+use crate::Color;
 use crate::Vec3;
+use std::cmp::Ordering;
 
+const TEMP_UV: (f32, f32) = (0.0, 0.0);
+//use crate::rendering::random_hemisphere_distribution;
 pub struct Ray {
     pub origin: Vec3,
     pub direction: Vec3,
+    pub time: f32,
 }
 
 impl Ray {
-    pub fn prime(x: u32, y: u32, scene: &Scene) -> Ray {
-        let fov_adjustment = (scene.fov.to_radians() / 2.0).tan();
-        let aspect_ratio = (scene.width as f64) / (scene.height as f64);
-
-        let prime_x =
-            ((((x as f64 + 0.5) / scene.width as f64) * 2.0 - 1.0) * aspect_ratio) * fov_adjustment;
-        let prime_y = (1.0 - ((y as f64 + 0.5) / scene.height as f64) * 2.0) * fov_adjustment;
-
+    pub fn new(origin: Vec3, direction: Vec3, time: f32) -> Ray {
         Ray {
-            origin: scene.cam_pos,
-            direction: Vec3 {
-                x: prime_x,
-                y: prime_y,
-                z: -1.0,
-            }
-            .normalize(),
+            origin,
+            direction,
+            time,
         }
     }
 
-    pub fn reflection(normal: Vec3, incident: Vec3, point: Vec3, shadow_bias: f64) -> Ray {
-        Ray {
-            // add shadow bias
-            origin: point + (normal * shadow_bias),
-            direction: incident - (2.0 * incident.dot(&normal) * normal),
-        }
+    pub fn front_face(&self, outward_normal: &Vec3) -> bool {
+        self.direction.dot(&outward_normal) < 0.0
     }
 
-    // pub fn transmission(
-    //     normal: Vec3,
-    //     incident: Vec3,
-    //     point: Vec3,
-    //     shadow_bias: f64,
-    //     refractive_index: f64,
-    // ) -> Option<Ray> {
-    //     let mut ref_n = normal;
-    //     let mut eta_t = refractive_index;
-    //     let mut eta_i = 1.0;
-    //     let mut i_dot_n = incident.dot(&normal);
+    pub fn trace<'traced>(
+        &self,
+        objects: &'traced Vec<Object>,
+        t_min: f32,
+        t_max: f32,
+    ) -> Option<Intersection<'traced>> {
+        objects
+            .into_iter()
+            .filter_map(|obj| obj.intersects(self, t_min, t_max))
+            .min_by(|inter1, inter2| {
+                inter1
+                    .distance
+                    .partial_cmp(&inter2.distance)
+                    .unwrap_or(Ordering::Equal)
+            })
+    }
 
-    //     if i_dot_n < 0.0 {
-    //         i_dot_n = -i_dot_n;
-    //     } else {
-    //         ref_n = -normal;
-    //         eta_i = eta_t;
-    //         eta_t = 1.0;
-    //     }
-
-    //     let eta = eta_i / eta_t;
-    //     let k = 1.0 - (eta * eta) * (1.0 - i_dot_n * i_dot_n);
-    //     if k < 0.0 {
-    //         None
-    //     } else {
-    //         Some(Ray {
-    //             origin: point + (ref_n * -shadow_bias),
-    //             direction: (incident + i_dot_n * ref_n) * eta - ref_n * k.sqrt(),
+    // pub fn trace<'traced>(
+    //     &self,
+    //     objects: &'traced Vec<Object>,
+    //     t_min: f32,
+    //     t_max: f32,
+    // ) -> Option<Intersection<'traced>> {
+    //     objects
+    //         .into_iter()
+    //         .filter_map(|obj| {
+    //             obj.intersects(self, t_min, t_max)
+    //                 .map(|distance| Intersection::new(distance, &obj))
     //         })
+    //         .min_by(|inter1, inter2| {
+    //             inter1
+    //                 .distance
+    //                 .partial_cmp(&inter2.distance)
+    //                 .unwrap_or(Ordering::Equal)
+    //         })
+    // }
+
+    //    pub fn color(&self, objects: &Vec<Object>, depth: u32) -> Color {
+    pub fn color(&self, world: &Vec<Object>, background: &Color, depth: u32) -> Color {
+        if depth <= 0 {
+            return BLACK;
+        }
+
+        match self.trace(world, 0.001, ::std::f32::MAX) {
+            Some(i) => {
+                let mat = &i.mat;
+                let emitted = mat.emitted(TEMP_UV, &i);
+                return match mat.scatter(self, &i) {
+                    Some((attenuation, scattered)) => {
+                        emitted + attenuation * scattered.color(world, background, depth - 1)
+                    }
+
+                    None => emitted,
+                };
+
+                //return Color::new(1.0, 1.0, 1.0);
+                // let target = point + random_hemisphere_distribution(surf_norm);
+                // let nr = Ray::new(point, target - point);
+                // 0.5 * nr.color(objects, depth - 1)
+            }
+            None => {
+                *background
+                // let t = 0.5 * (self.direction.normalize().y + 1.0);
+                // (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+            }
+        }
+    }
+
+    pub fn bvh_color(&self, world: &BvhTree, background: &Color, depth: u32) -> Color {
+        if depth <= 0 {
+            return BLACK;
+        }
+
+        match world.hit(self, 0.001, ::std::f32::MAX) {
+            Some(i) => {
+                let mat = &i.mat;
+                let emitted = mat.emitted(TEMP_UV, &i);
+                return match mat.scatter(self, &i) {
+                    Some((attenuation, scattered)) => {
+                        emitted + attenuation * scattered.bvh_color(world, background, depth - 1)
+                    }
+
+                    None => emitted,
+                };
+
+                // let point = self.at(i.distance);
+                // let mat = i.object.material();
+                // let emitted = mat.emitted(TEMP_UV, point, i.object);
+
+                // return match mat.scatter(self, point, i.object) {
+                //     Some((attenuation, scattered)) => {
+                //         emitted + attenuation * scattered.bvh_color(world, background, depth - 1)
+                //     }
+
+                //     None => emitted,
+                // };
+
+                //return Color::new(1.0, 1.0, 1.0);
+                // let target = point + random_hemisphere_distribution(surf_norm);
+                // let nr = Ray::new(point, target - point);
+                // 0.5 * nr.color(objects, depth - 1)
+            }
+            None => {
+                *background
+                // let t = 0.5 * (self.direction.normalize().y + 1.0);
+                // (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+            }
+        }
+    }
+
+    // pub fn bvh_both(
+    //     &self,
+    //     world: &BvhTree,
+    //     background: &Color,
+    //     depth: u32,
+    // ) -> (Color, Vec<f32>, Vec<f32>) {
+    //     const TEMP_UV: (f32, f32) = (0.0, 0.0);
+
+    //     match world.hit(self, 0.001, ::std::f32::MAX) {
+    //         Some(i) => {
+    //             let mat = &i.mat;
+    //             let emitted = mat.emitted(TEMP_UV, &i);
+    //             return match mat.scatter(self, &i) {
+    //                 Some((attenuation, scattered)) => (
+    //                     emitted + attenuation * scattered.bvh_color(world, background, depth - 1),
+    //                     mat.albedo(i.uv, i.outward_normal).to_vec_f32(),
+    //                     i.normal.to_vec_f32(),
+    //                 ),
+
+    //                 None => (emitted, m,
+    //             };
+    //         }
+    //         None => (
+    //             *background,
+    //             background.to_vec_f32(),
+    //             Vec3::zero().to_vec_f32(),
+    //         ),
     //     }
     // }
 
-    // pub fn fresnel(incident: Vec3, normal: Vec3, refractive_index: f64) -> f64 {
-    //     let i_dot_n = incident.dot(&normal);
-    //     let mut eta_i = 1.0;
-    //     let mut eta_t = refractive_index;
-    //     if i_dot_n > 0.0 {
-    //         eta_i = eta_t;
-    //         eta_t = 1.0;
-    //     }
+    pub fn bvh_buffer(&self, world: &BvhTree, background: &Color) -> (Vec<f32>, Vec<f32>) {
+        match world.hit(self, 0.001, ::std::f32::MAX) {
+            Some(i) => {
+                // let point = self.at(i.distance);
+                let mat = i.mat;
+                // let emitted = mat.emitted(TEMP_UV, point, i.object);
+                let normal = i.normal;
 
-    //     let sin_t = eta_i / eta_t * (1.0 - i_dot_n * i_dot_n).max(0.0).sqrt();
-    //     if sin_t > 1.0 {
-    //         return 1.0;
-    //     } else {
-    //         let cos_t = (1.0 - sin_t * sin_t).max(0.0).sqrt();
-    //         let cos_i = cos_t.abs();
-    //         let r_s = ((eta_t * cos_i) - (eta_i * cos_t)) / ((eta_t * cos_i) + (eta_i * cos_t));
-    //         let r_p = ((eta_i * cos_i) - (eta_t * cos_t)) / ((eta_i * cos_i) + (eta_t * cos_t));
-    //         return (r_s * r_s + r_p * r_p) / 2.0;
+                // let outward_normal = i.outward_normal;
+                let uv = i.uv;
+
+                // changed from outward normal to point
+                (mat.albedo(uv, i.point).to_vec_f32(), normal.to_vec_f32())
+            }
+            None => (background.to_vec_f32(), Vec3::zero().to_vec_f32()),
+        }
+    }
+
+    pub fn buffer(&self, world: &Vec<Object>, background: &Color) -> (Vec<f32>, Vec<f32>) {
+        match self.trace(world, 0.001, ::std::f32::INFINITY) {
+            Some(i) => {
+                let point = self.at(i.distance);
+                let mat = i.mat;
+                // let emitted = mat.emitted(TEMP_UV, point, i.object);
+                let normal = i.normal;
+
+                let outward_normal = i.outward_normal;
+                let uv = i.uv;
+
+                (
+                    mat.albedo(uv, outward_normal).to_vec_f32(),
+                    normal.to_vec_f32(),
+                )
+            }
+            None => (background.to_vec_f32(), Vec3::zero().to_vec_f32()),
+        }
+    }
+
+    pub fn at(&self, t: f32) -> Vec3 {
+        self.origin + t * self.direction
+    }
+
+    // pub fn prime(x: u32, y: u32, scene: &Scene) -> Ray {
+    //     let fov_adjustment = (scene.fov.to_radians() / 2.0).tan();
+    //     let aspect_ratio = (scene.width as f32) / (scene.height as f32);
+
+    //     let prime_x =
+    //         ((((x as f32 + 0.5) / scene.width as f32) * 2.0 - 1.0) * aspect_ratio) * fov_adjustment;
+    //     let prime_y = (1.0 - ((y as f32 + 0.5) / scene.height as f32) * 2.0) * fov_adjustment;
+
+    //     Ray {
+    //         origin: scene.cam_pos,
+    //         direction: Vec3 {
+    //             x: prime_x,
+    //             y: prime_y,
+    //             z: -1.0,
+    //         }
+    //         .normalize(),
+    //     }
+    // }
+
+    // pub fn reflection(normal: Vec3, incident: Vec3, point: Vec3, shadow_bias: f32) -> Ray {
+    //     Ray {
+    //         origin: point + (normal * shadow_bias),
+    //         direction: incident - (2.0 * incident.dot(&normal) * normal),
     //     }
     // }
 }
+
+// let obj = &world[0];
+
+// //let mut intersected_obj: Object;
+// match obj.intersects(self, 0.001, ::std::f32::INFINITY, world) {
+//     Some(i) => {
+//         //   println!("meep");
+//         let point = self.at(i.distance);
+
+//         let mat = i.object.material().unwrap();
+//         // if let Some(mat) = i.object.material() {
+//         if let Some((attenuation, scattered)) = mat.scatter(self, point, i.object) {
+//             return attenuation * scattered.color(world, depth - 1);
+//         }
+//         //}
+
+//         return Color::new(0.0, 0.0, 0.0);
+//         // let target = point + random_hemisphere_distribution(surf_norm);
+//         // let nr = Ray::new(point, target - point);
+//         // 0.5 * nr.color(objects, depth - 1)
+//     }
+//     None => {
+//         let t = 0.5 * (self.direction.normalize().y + 1.0);
+//         (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+//     }
+// }

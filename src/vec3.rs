@@ -1,27 +1,30 @@
-// use serde::{Deserialize, Deserializer};
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use core::panic;
+use std::ops::{Add, Div, Index, IndexMut, Mul, Neg, Sub};
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct Vec3 {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 impl Vec3 {
+    pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
+        Vec3 { x, y, z }
+    }
     pub fn zero() -> Vec3 {
         Vec3::from_one(0.0)
     }
 
-    pub fn from_one(v: f64) -> Vec3 {
+    pub fn from_one(v: f32) -> Vec3 {
         Vec3 { x: v, y: v, z: v }
     }
 
-    pub fn length(&self) -> f64 {
+    pub fn length(&self) -> f32 {
         self.norm().sqrt()
     }
 
-    pub fn norm(&self) -> f64 {
+    pub fn norm(&self) -> f32 {
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
@@ -34,7 +37,7 @@ impl Vec3 {
         }
     }
 
-    pub fn dot(&self, other: &Vec3) -> f64 {
+    pub fn dot(&self, other: &Vec3) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
@@ -52,6 +55,23 @@ impl Vec3 {
             y: self.z.abs(),
             z: self.x.abs(),
         }
+    }
+
+    pub fn near_zero(&self) -> bool {
+        const S: f32 = 1e-8;
+        self.x.abs() < S && self.y.abs() < S && self.z.abs() < S
+    }
+
+    pub fn to_vec(&self) -> Vec<f32> {
+        vec![self.x, self.y, self.z]
+    }
+
+    pub fn to_vec_f32(&self) -> Vec<f32> {
+        vec![
+            (self.x).max(-1.0).min(1.0) as f32,
+            (self.y).max(-1.0).min(1.0) as f32,
+            (self.z).max(-1.0).min(1.0) as f32,
+        ]
     }
 }
 
@@ -91,10 +111,10 @@ impl Mul for Vec3 {
     }
 }
 
-impl Mul<f64> for Vec3 {
+impl Mul<f32> for Vec3 {
     type Output = Vec3;
 
-    fn mul(self, other: f64) -> Vec3 {
+    fn mul(self, other: f32) -> Vec3 {
         Vec3 {
             x: self.x * other,
             y: self.y * other,
@@ -103,10 +123,10 @@ impl Mul<f64> for Vec3 {
     }
 }
 
-impl Div<f64> for Vec3 {
+impl Div<f32> for Vec3 {
     type Output = Vec3;
 
-    fn div(self, other: f64) -> Vec3 {
+    fn div(self, other: f32) -> Vec3 {
         Vec3 {
             x: self.x / other,
             y: self.y / other,
@@ -127,7 +147,7 @@ impl Div for Vec3 {
     }
 }
 
-impl Div<Vec3> for f64 {
+impl Div<Vec3> for f32 {
     type Output = Vec3;
 
     fn div(self, other: Vec3) -> Vec3 {
@@ -135,7 +155,7 @@ impl Div<Vec3> for f64 {
     }
 }
 
-impl Mul<Vec3> for f64 {
+impl Mul<Vec3> for f32 {
     type Output = Vec3;
 
     fn mul(self, other: Vec3) -> Vec3 {
@@ -151,6 +171,54 @@ impl Neg for Vec3 {
             x: -self.x,
             y: -self.y,
             z: -self.z,
+        }
+    }
+}
+
+impl Index<&'_ usize> for Vec3 {
+    type Output = f32;
+
+    fn index(&self, i: &usize) -> &f32 {
+        match i {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => &0.0,
+        }
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f32;
+
+    fn index(&self, i: usize) -> &f32 {
+        match i {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("index out of bounds!: {}", i),
+        }
+    }
+}
+
+impl IndexMut<&'_ usize> for Vec3 {
+    fn index_mut(&mut self, i: &usize) -> &mut f32 {
+        match i {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("index out of bounds!: {}", i),
+        }
+    }
+}
+
+impl IndexMut<usize> for Vec3 {
+    fn index_mut(&mut self, i: usize) -> &mut f32 {
+        match i {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("index out of bounds!: {}", i),
         }
     }
 }
