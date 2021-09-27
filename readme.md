@@ -30,7 +30,6 @@ This was really fun to work on and I am very happy with how it turned out.
 </a>
 
 #### Next Steps
-
 - ~Specular Highlights~
 - ~Reflection~
 - ~Global illumination~
@@ -41,7 +40,6 @@ This was really fun to work on and I am very happy with how it turned out.
 - another rewrite...
 
 ## References
-
 - [Ray Tracing In One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
 - [Ray Tracing The Next Week](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
 - [Loading in .obj Objects](https://github.com/perliedman)
