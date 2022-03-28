@@ -14,7 +14,7 @@ pub mod rendering;
 
 pub mod aabb;
 pub mod bvh;
-// pub mod bvh2;
+pub mod bvh2;
 pub mod perlin;
 pub mod texture;
 pub mod vec3;
@@ -28,7 +28,8 @@ use vec3::Vec3;
 
 use crate::bvh::BvhTree;
 
-use crate::objects::{load_obj, BoxObj, ConstantMedium};
+use crate::materials::Glossy;
+use crate::objects::{load_obj, to_bvh, BigObject, BoxObj, ConstantMedium};
 use crate::rendering::{random_distribution, random_float, DenoiseSettings};
 
 use oidn;
@@ -91,16 +92,16 @@ fn main() {
     //         5.0,
     //     )),
     // ));
-    // // !Floor
-    // world.push(Plane::new(
-    //     PlaneType::ZX,
-    //     -20.0,
-    //     20.0,
-    //     -20.0,
-    //     20.0,
-    //     0.0,
-    //     Lambertian::new(SolidColor::new(color!(1.0, 0.1, 0.1))),
-    // ));
+    // !Floor
+    world.push(Plane::new(
+        PlaneType::ZX,
+        -20.0,
+        20.0,
+        -20.0,
+        20.0,
+        0.0,
+        Lambertian::new(SolidColor::new(color!(1.0, 0.1, 0.1))),
+    ));
 
     // !Block
     world.push(BoxObj::new(
@@ -109,71 +110,7 @@ fn main() {
         Lambertian::new(SolidColor::new(color!(1.0, 0.1, 0.1))),
     ));
 
-    let teapot = load_obj(
-        Path::new("./teapot.obj"),
-        Vec3::new(0.0, 0.5, 0.0),
-        0.45,
-        Lambertian::new(SolidColor::new(WHITE)),
-    );
-    teapot.into_iter().for_each(|t| world.push(t));
-
-    world.push(Sphere::new(
-        Vec3::new(-4.8, 1.5, -0.6),
-        1.0,
-        Metal::new(SolidColor::new(color!(1.0, 1.0, 1.0)), 0.01),
-    ));
-
-    world.push(Sphere::new(
-        Vec3::new(-2.7, 1.2, 2.45),
-        0.7,
-        Lambertian::new(SolidColor::new(color!(1.0, 1.0, 1.0))),
-    ));
-
-    world.push(Sphere::new(
-        Vec3::new(4.6, 1.6, 0.0),
-        1.1,
-        Dielectric::new(1.4), // Metal::new(SolidColor::new(color!(1.0, 1.0, 1.0)), 0.01),
-    ));
-
-    world.push(ConstantMedium::new(
-        Sphere::new(
-            Vec3::new(2.2, 1.35, -2.15),
-            0.85,
-            Isotropic::new(SolidColor::new(color!(
-                255.0 / 255.0,
-                228.0 / 255.0,
-                140.0 / 255.0
-            ))),
-        ),
-        100.0, // Metal::new(SolidColor::new(color!(1.0, 1.0, 1.0)), 0.01),
-    ));
-
-    world.push(
-        Sphere::new(Vec3::new(2.2, 1.35, -2.15), 0.85, Dielectric::new(1.8)),
-        // Metal::new(SolidColor::new(color!(1.0, 1.0, 1.0)), 0.01),
-    );
-
-    // world.push(BoxObj::new(
-    //     Vec3::new(-2.0, 0.5, 0.0),
-    //     Vec3::new(-1.5, 1.0, 0.5),
-    //     EmissiveDiffuse::new(SolidColor::new(color!(
-    //         255.0 / 100.0,
-    //         228.0 / 100.0,
-    //         140.0 / 100.0
-    //     ))),
-    // ));
-
-    // world.push(BoxObj::new(
-    //     Vec3::new(0.5, 0.5, -0.5),
-    //     Vec3::new(1.0, 1.0, 0.0),
-    //     EmissiveDiffuse::new(SolidColor::new(color!(
-    //         255.0 / 100.0,
-    //         255.0 / 100.0,
-    //         100.0 / 100.0
-    //     ))),
-    // ));
-
-    let lights = 8;
+    let lights = 2;
     let d = 0.8;
     let w = 0.4;
     let s = 0.2;
@@ -189,37 +126,16 @@ fn main() {
         ))
     });
 
-    let blocks = 36;
-    let w = 0.5;
-    let mut flip = true;
-    (-blocks..blocks).for_each(|y| {
-        (-blocks..blocks).for_each(|x| {
-            let center = Vec3::new(x as f32 * w, random_float(-0.8, -0.3), y as f32 * w);
-
-            let x1 = center.x + w;
-            let y1 = center.y + w;
-            let z1 = center.z + w;
-
-            let mat = if flip {
-                Lambertian::new(SolidColor::new(color!(1.0, 0.1, 0.1)))
-            } else {
-                Lambertian::new(SolidColor::new(color!(0.5, 0.1, 0.1)))
-            };
-
-            world.push(BoxObj::new(center, Vec3::new(x1, y1, z1), mat));
-            flip = !flip;
-        });
-        flip = !flip;
-    });
-
     let _dn = Some(DenoiseSettings {
         srgb: false,
         hdr: true,
         clean_aux: false,
     });
 
-    let bvh_world = BvhTree::new(&mut world);
-    let img = camera.bvh_render(&bvh_world, &color!(0.0, 0.0, 0.0), 3840, 128, 50, _dn);
+    let boxed_world = world.into_iter().map(|o| Box::new(o)).collect();
+    // let bvh_world = BvhTree::new(&mut world);
+    let bvh_world = bvh2::BVH::new(boxed_world, 0.0, 1.0);
+    let img = camera.bvh2_render(&bvh_world, &color!(0.0, 0.0, 0.0), 800, 128, 50, None);
     img.save("test.png").unwrap();
     // let img = camera.threaded_render(50, &world, &color!(0.0, 0.0, 0.0), 800, 32, 3, None);
     // let img = camera.pog_render(&world, &color!(0.0, 0.0, 0.0), 1000, 128, 50, None);

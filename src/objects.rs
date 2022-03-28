@@ -4,21 +4,23 @@ extern crate tobj;
 // use bvh::bvh::BVH;
 // use bvh::{Point3, Vector3};
 
-use std::default;
+// use std::default;
 // use std::cell::RefCell;
 // use std::cmp::Ordering;
 use std::f32::consts::PI;
 use std::path::Path;
-use std::sync::Arc;
+// use std::sync::Arc;
 
 // use std::ptr::null;
 
 use crate::aabb::Aabb;
+use crate::bvh2::BVH;
+// use crate::color::BLACK;
 use crate::intersection::Intersection;
 // use crate::color::Color;
 // use crate::intersection::Intersection;
 //use crate::color::Color;
-use crate::materials::{self, Dielectric, Lambertian, Material, Metal, Tracable};
+use crate::materials::{Dielectric, Isotropic, Lambertian, Material, Metal, Tracable};
 use crate::ray::Ray;
 
 use crate::texture::SolidColor;
@@ -35,6 +37,7 @@ pub enum Object {
     Box(BoxObj),
     ConstantMedium(ConstantMedium),
     Triangle(Triangle),
+    BigObject(BigObject),
 }
 pub trait Intersectable {
     fn intersects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection>;
@@ -48,20 +51,6 @@ pub trait Intersectable {
 }
 
 impl Object {
-    pub fn material(&self) -> &Material {
-        match *self {
-            Object::Sphere(ref obj) => &obj.material,
-            // Object::MovingSphere(ref obj) => &obj.material,
-            //Object::BVHNode(ref _obj) => None,
-            Object::Plane(ref obj) => &obj.material,
-            Object::Box(ref obj) => &obj.faces[0].material(),
-            Object::ConstantMedium(ref obj) => &obj.boundary.material(),
-            Object::Triangle(ref obj) => &obj.material,
-        }
-    }
-    // }
-
-    // impl Intersectable for Object {
     pub fn intersects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection> {
         match *self {
             Object::Sphere(ref obj) => obj.intersects(ray, t_min, t_max),
@@ -70,18 +59,8 @@ impl Object {
             Object::Box(ref obj) => obj.intersects(ray, t_min, t_max),
             Object::ConstantMedium(ref obj) => obj.intersects(ray, t_min, t_max),
             Object::Triangle(ref obj) => obj.intersects(ray, t_min, t_max),
+            Object::BigObject(ref obj) => obj.intersects(ray, t_min, t_max),
         }
-        // let intersect = match *self {
-        //     Object::Sphere(ref obj) => obj.intersects(ray, t_min, t_max),
-        //     Object::MovingSphere(ref obj) => obj.intersects(ray, t_min, t_max),
-        //     Object::BVHNode(ref obj) => return obj.intersects(ray, t_min, t_max, world),
-        //     // Object::Plane(ref obj) => obj.intersects(ray, t_min, t_max),
-        // };
-
-        // match intersect {
-        //     Some(distance) => Some(Intersection::new(distance, self)),
-        //     None => None,
-        // }
     }
 
     pub fn surface_normal(&self, point: &Vec3, ray: &Ray) -> Vec3 {
@@ -93,6 +72,7 @@ impl Object {
             Object::Box(ref _obj) => Vec3::zero(),
             Object::ConstantMedium(ref obj) => obj.surface_normal(point, ray),
             Object::Triangle(ref obj) => obj.surface_normal(point, ray),
+            Object::BigObject(ref _obj) => Vec3::zero(),
         }
     }
 
@@ -105,6 +85,7 @@ impl Object {
             Object::Box(ref _obj) => (0.0, 0.0),
             Object::ConstantMedium(ref obj) => obj.surface_uv(point),
             Object::Triangle(ref obj) => obj.surface_uv(point),
+            Object::BigObject(ref _obj) => (0.0, 0.0),
         }
     }
 
@@ -117,6 +98,7 @@ impl Object {
             Object::Box(ref _obj) => Vec3::zero(),
             Object::ConstantMedium(ref obj) => obj.outward_normal(point, time),
             Object::Triangle(ref obj) => obj.outward_normal(point, time),
+            Object::BigObject(ref _obj) => Vec3::zero(),
         }
     }
 
@@ -129,20 +111,10 @@ impl Object {
             Object::Box(ref obj) => obj.bounding_box(),
             Object::ConstantMedium(ref obj) => obj.bounding_box(),
             Object::Triangle(ref obj) => obj.bounding_box(),
+            Object::BigObject(ref obj) => obj.bounding_box(),
         }
     }
 }
-
-// impl Bounded for Object {
-//     fn aabb(&self) -> AABB {
-//         match *self {
-//             Object::Sphere(ref obj) => obj.aabb(),
-//             // Object::MovingSphere(ref obj) => obj.aabb(point, time),
-//             //   Object::BVHNode(ref obj) => obj.outward_normal(point, time),
-//             // Object::Plane(ref obj) => obj.aabb(),
-//         }
-//     }
-// }
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
@@ -219,104 +191,6 @@ impl Intersectable for Sphere {
     }
 }
 
-// impl Bounded for Sphere {
-//     fn aabb(&self) -> AABB {
-//         let half_size = Vector3::new(self.radius, self.radius, self.radius);
-//         let min = self.center - half_size;
-//         let max = self.center + half_size;
-//         AABB::with_bounds(min, max)
-//     }
-// }
-
-// #[allow(dead_code)]
-// #[derive(Clone, Debug)]
-// pub struct MovingSphere {
-//     pub center_0: Vec3,
-//     pub center_1: Vec3,
-//     pub time_0: f32,
-//     pub time_1: f32,
-//     pub radius: f32,
-//     pub material: Material,
-// }
-
-// impl MovingSphere {
-//     pub fn new(
-//         center_0: Vec3,
-//         center_1: Vec3,
-//         time_0: f32,
-//         time_1: f32,
-//         radius: f32,
-//         material: Material,
-//     ) -> Object {
-//         Object::MovingSphere(MovingSphere {
-//             center_0,
-//             center_1,
-//             time_0,
-//             time_1,
-//             radius,
-//             material,
-//         })
-//     }
-
-//     pub fn center(&self, time: f32) -> Vec3 {
-//         self.center_0
-//             + ((time - self.time_0) / (self.time_1 - self.time_0)) * (self.center_1 - self.center_0)
-//     }
-// }
-
-// impl Intersectable for MovingSphere {
-//     fn intersects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<f32> {
-//         let oc = ray.origin - self.center(ray.time);
-//         let a = ray.direction.norm();
-//         let half_b = oc.dot(&ray.direction);
-//         let c = oc.norm() - self.radius * self.radius;
-//         let discriminant = half_b * half_b - a * c;
-
-//         if discriminant < 0.0 {
-//             return None;
-//         }
-
-//         let sqrtd = discriminant.sqrt();
-//         let mut root = (-half_b - sqrtd) / a;
-//         if root < t_min || t_max < root {
-//             root = (-half_b + sqrtd) / a;
-//             if root < t_min || t_max < root {
-//                 return None;
-//             }
-//         }
-//         Some(root)
-//     }
-
-//     fn surface_normal(&self, point: &Vec3, _ray: &Ray) -> Vec3 {
-//         (*point - self.center(0.0)).normalize()
-//     }
-
-//     fn outward_normal(&self, point: &Vec3, time: f32) -> Vec3 {
-//         (*point - self.center(time)) / self.radius
-//     }
-
-//     fn surface_uv(&self, point: &Vec3) -> (f32, f32) {
-//         let theta = (-point.y).acos();
-//         let phi = (-point.z).atan2(point.x) + PI_F32;
-
-//         (phi / (2.0 * PI_F32), theta / PI_F32)
-//     }
-
-// fn bounding_box(&self, time_0: f32, time_1: f32) -> AABB {
-//     let box_0 = AABB::new(
-//         self.center(time_0) - Vec3::new(self.radius, self.radius, self.radius),
-//         self.center(time_0) + Vec3::new(self.radius, self.radius, self.radius),
-//     );
-
-//     let box_1 = AABB::new(
-//         self.center(time_1) - Vec3::new(self.radius, self.radius, self.radius),
-//         self.center(time_1) + Vec3::new(self.radius, self.radius, self.radius),
-//     );
-
-//     AABB::surrounding_box(box_0, box_1)
-// }
-// }
-
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum PlaneType {
@@ -387,9 +261,6 @@ impl Intersectable for Plane {
                 let point = ray.at(t);
                 let u = (a - self.a0) / (self.a1 - self.a0);
                 let v = (b - self.b0) / (self.b1 - self.b0);
-                // let mut n = Vec3::zero().to_vec();
-                // n[k_axis] = 1.0;
-                // let normal = Vec3::new(n[0], n[1], n[2]);
 
                 Some(Intersection::new(
                     t,
@@ -399,22 +270,6 @@ impl Intersectable for Plane {
                     &self.material,
                     (u, v),
                 ))
-
-                // let u = (a - self.a0) / (self.a1 - self.a0);
-                // let v = (b - self.b0) / (self.b1 - self.b0);
-                // let p = ray.at(t);
-
-                // let mut normal = Vec3::zero().to_vec();
-                // normal[k_axis] = 1.0;
-
-                // Some(HitRecord {
-                //     t,
-                //     u,
-                //     v,
-                //     p,
-                //     normal,
-                //     material: &self.material,
-                // })
             }
         }
     }
@@ -423,7 +278,7 @@ impl Intersectable for Plane {
         let (k_axis, _a_axis, _b_axis) = Plane::get_axis(&self.plane_type);
         // let p = point.to_vec();
         let mut normal = Vec3::zero();
-        normal[k_axis] = 1.0;
+        // normal[k_axis] = 1.0;
 
         if ray.origin[k_axis] > self.k {
             normal[k_axis] = 1.0;
@@ -436,11 +291,6 @@ impl Intersectable for Plane {
     }
 
     fn outward_normal(&self, point: &Vec3, _time: f32) -> Vec3 {
-        // let (k_axis, _a_axis, _b_axis) = Plane::get_axis(&self.plane_type);
-        // let mut normal = Vec3::zero().to_vec();
-        // normal[k_axis] = 1.0;
-
-        // Vec3::new(normal[0], normal[1], normal[2])
         *point
     }
 
@@ -567,15 +417,17 @@ pub fn create_box(min: Vec3, max: Vec3, material: Material) -> Vec<Object> {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct ConstantMedium {
-    boundary: Arc<Object>,
+    boundary: BVH,
     density: f32,
+    phase_function: Material,
 }
 
 impl ConstantMedium {
-    pub fn new(boundary: Object, density: f32) -> Object {
+    pub fn new(boundary: BVH, density: f32, phase_function: Material) -> Object {
         Object::ConstantMedium(ConstantMedium {
-            boundary: Arc::new(boundary),
+            boundary,
             density,
+            phase_function,
         })
     }
 }
@@ -606,90 +458,36 @@ impl Intersectable for ConstantMedium {
                     if hit_distance < distance_inside_boundary {
                         let distance = hit1.distance + hit_distance / ray.direction.norm();
                         let point = ray.at(distance);
-                        let outward_normal = self.outward_normal(&point, ray.time);
+                        let outward_normal = hit2.outward_normal;
                         return Some(Intersection {
                             distance,
                             point,
                             normal: ARBITRARY_NORM, // Arbitrary
                             outward_normal,
-                            mat: self.boundary.material(),
-                            uv: self.surface_uv(&point),
+                            mat: &self.phase_function,
+                            uv: hit2.uv,
                         });
-
-                        // let t = hit1.distance + hit_distance / ray.direction.norm();
-                        // return Some(HitRecord {
-                        //     t,
-                        //     u: 0.0,
-                        //     v: 0.0,
-                        //     p: ray.point_at_parameter(t),
-                        //     normal: Vector3::new(1.0, 0.0, 0.0), // arbitrary
-                        //     material: &self.phase_function,
-                        // });
                     }
                 }
             }
         }
         None
     }
-    // fn intersects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection> {
-    //     if let Some(mut hit1) = self.boundary.intersects(ray, -(f32::MAX), f32::MAX) {
-    //         if let Some(mut hit2) = self
-    //             .boundary
-    //             .intersects(ray, hit1.distance + 1e-4, f32::MAX)
-    //         {
-    //             if hit1.distance < t_min {
-    //                 hit1.distance = t_min
-    //             }
 
-    //             if hit2.distance > t_max {
-    //                 hit2.distance = t_max
-    //             }
-
-    //             if hit1.distance < hit2.distance {
-    //                 return None;
-    //             }
-
-    //             if hit1.distance < 0.0 {
-    //                 hit1.distance = 0.0
-    //             }
-
-    //             let distance_inside_boundary =
-    //                 (hit2.distance - hit1.distance) * ray.direction.length();
-    //             let hit_distance = (-1.0 / self.density) * rand::random::<f32>().ln();
-
-    //             if hit_distance <= distance_inside_boundary {
-    //                 let distance = hit1.distance + hit_distance / ray.direction.length();
-    //                 let point = ray.at(distance);
-    //                 let outward_normal = self.outward_normal(&point, ray.time);
-    //                 return Some(Intersection {
-    //                     distance,
-    //                     point,
-    //                     normal: Vec3::new(1.0, 0.0, 0.0), // Arbitrary
-    //                     outward_normal,
-    //                     mat: self.boundary.material(),
-    //                     uv: self.surface_uv(&point),
-    //                 });
-    //             }
-    //         }
-    //     }
-
-    //     None
-    // }
-
-    fn outward_normal(&self, point: &Vec3, time: f32) -> Vec3 {
-        self.boundary.outward_normal(point, time)
+    fn outward_normal(&self, _point: &Vec3, _time: f32) -> Vec3 {
+        Vec3::zero()
     }
 
-    fn surface_normal(&self, point: &Vec3, ray: &Ray) -> Vec3 {
-        self.boundary.surface_normal(point, ray)
+    fn surface_normal(&self, _point: &Vec3, _ray: &Ray) -> Vec3 {
+        Vec3::zero()
     }
 
     fn bounding_box(&self) -> Option<Aabb> {
-        self.boundary.bounding_box()
+        Some(self.boundary.bbox)
     }
 
-    fn surface_uv(&self, point: &Vec3) -> (f32, f32) {
-        self.boundary.surface_uv(point)
+    fn surface_uv(&self, _point: &Vec3) -> (f32, f32) {
+        (0.0, 0.0)
     }
 }
 #[derive(Clone, Debug)]
@@ -707,7 +505,7 @@ impl Triangle {
             v0,
             v1,
             v2,
-            normal: (v1 - v0).cross(&(v2 - v0)),
+            normal: (v1 - v0).cross(&(v2 - v0)).normalize(),
             material,
         }
     }
@@ -764,7 +562,7 @@ impl Intersectable for Triangle {
         return Some(Intersection {
             distance: t,
             point: p,
-            normal: -self.normal,
+            normal: self.normal,
             outward_normal: self.outward_normal(&p, 0.0),
             mat: &self.material,
             uv: (u, v),
@@ -772,7 +570,7 @@ impl Intersectable for Triangle {
     }
 
     fn surface_normal(&self, _point: &Vec3, _ray: &Ray) -> Vec3 {
-        -self.normal
+        self.normal
     }
 
     fn surface_uv(&self, _point: &Vec3) -> (f32, f32) {
@@ -852,20 +650,49 @@ pub fn load_obj(path: &Path, origin: Vec3, scale: f32, default_mat: Material) ->
             };
 
             let tri: Triangle;
-            if mesh.normals.len() > 0 {
-                let normal = Vec3::new(
-                    mesh.normals[i0 * 3],
-                    mesh.normals[i0 * 3 + 1],
-                    mesh.normals[i0 * 3 + 2],
-                );
-                tri = Triangle::new_with_normal(v0, v1, v2, normal, mat)
-            } else {
-                tri = Triangle::new(v0, v1, v2, mat);
-            }
+            // if mesh.normals.len() > 0 {
+            //     let normal = Vec3::new(
+            //         mesh.normals[i0 * 3],
+            //         mesh.normals[i0 * 3 + 1],
+            //         mesh.normals[i0 * 3 + 2],
+            //     );
+            //     tri = Triangle::new_with_normal(v0, v1, v2, normal, mat)
+            // } else {
+            tri = Triangle::new(v0, v1, v2, mat);
+            // }
 
             world.push(Object::Triangle(tri));
         }
     }
 
     world
+}
+
+#[derive(Clone, Debug)]
+pub struct BigObject {
+    pub objects: BVH,
+}
+
+impl BigObject {
+    pub fn intersects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<Intersection> {
+        self.objects.intersects(ray, t_min, t_max)
+    }
+
+    pub fn bounding_box(&self) -> Option<Aabb> {
+        Some(self.objects.bbox)
+    }
+
+    pub fn new(objects: Vec<Object>) -> Object {
+        let b_objects: Vec<Box<Object>> = objects.into_iter().map(|o| Box::new(o)).collect();
+
+        Object::BigObject(BigObject {
+            objects: BVH::new(b_objects, 0.0, 1.0),
+        })
+    }
+}
+
+pub fn to_bvh(objects: Vec<Object>) -> BVH {
+    let b_objects: Vec<Box<Object>> = objects.into_iter().map(|o| Box::new(o)).collect();
+
+    BVH::new(b_objects, 0.0, 1.0)
 }

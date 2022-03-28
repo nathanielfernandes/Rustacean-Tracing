@@ -1,7 +1,7 @@
-use std::sync::Arc;
+// use std::sync::Arc;
 
 use crate::{color::Color, vec3::Vec3};
-use image::{DynamicImage, GenericImageView};
+// use image::{DynamicImage, GenericImageView};
 
 pub fn clamp(value: f32, lower: f32, upper: f32) -> f32 {
     value.min(upper).max(lower)
@@ -19,8 +19,9 @@ impl Texture {
     pub fn get_color_uv(&self, uv: (f32, f32), point: Vec3) -> Color {
         match *self {
             Texture::SolidColor(ref tex) => tex.get_color_uv(uv, point),
-            Texture::CheckerBoard(ref tex) => tex.get_color_uv(uv, point), //Texture::(ref obj) => obj.outward_normal(point, time),
-                                                                           // Texture::Image(ref tex) => tex.get_color_uv(uv, point),
+            Texture::CheckerBoard(ref tex) => tex.get_color_uv(uv, point),
+            //Texture::(ref obj) => obj.outward_normal(point, time),
+            // Texture::Image(ref tex) => tex.get_color_uv(uv, point),
         }
     }
 }

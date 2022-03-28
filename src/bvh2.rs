@@ -1,26 +1,28 @@
 use crate::aabb;
 use crate::aabb::Aabb;
-use crate::intersection::{self, Intersection};
+use crate::intersection::Intersection;
 use crate::objects::Object;
 use crate::ray::Ray;
 use std::cmp::Ordering;
 use std::f32;
 
+#[derive(Clone, Debug)]
 enum BVHNode {
     Branch { left: Box<BVH>, right: Box<BVH> },
     Leaf(Box<Object>),
 }
 
+#[derive(Clone, Debug)]
 pub struct BVH {
     tree: BVHNode,
-    bbox: Aabb,
+    pub bbox: Aabb,
 }
 
 impl BVH {
     pub fn new(mut hitable: Vec<Box<Object>>, time0: f32, time1: f32) -> Self {
         fn box_compare(
-            time0: f32,
-            time1: f32,
+            _time0: f32,
+            _time1: f32,
             axis: usize,
         ) -> impl FnMut(&Box<Object>, &Box<Object>) -> Ordering {
             move |a, b| {
@@ -37,11 +39,11 @@ impl BVH {
             }
         }
 
-        fn axis_range(hitable: &Vec<Box<Object>>, time0: f32, time1: f32, axis: usize) -> f32 {
+        fn axis_range(hitable: &Vec<Box<Object>>, _time0: f32, _time1: f32, axis: usize) -> f32 {
             let (min, max) = hitable
                 .iter()
                 .fold((f32::MAX, f32::MIN), |(bmin, bmax), hit| {
-                    if let Some(aabb) = hit.bounding_box(time0, time1) {
+                    if let Some(aabb) = hit.bounding_box() {
                         (bmin.min(aabb.min[axis]), bmax.max(aabb.max[axis]))
                     } else {
                         (bmin, bmax)
@@ -64,7 +66,7 @@ impl BVH {
             0 => panic!["no elements in scene"],
             1 => {
                 let leaf = hitable.pop().unwrap();
-                if let Some(bbox) = leaf.bounding_box(time0, time1) {
+                if let Some(bbox) = leaf.bounding_box() {
                     BVH {
                         tree: BVHNode::Leaf(leaf),
                         bbox,
@@ -90,7 +92,7 @@ impl BVH {
 }
 
 impl BVH {
-    fn intersects(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
+    pub fn intersects(&self, ray: &Ray, t_min: f32, mut t_max: f32) -> Option<Intersection> {
         if self.bbox.hit(&ray, t_min, t_max) {
             match &self.tree {
                 BVHNode::Leaf(leaf) => leaf.intersects(&ray, t_min, t_max),
@@ -112,7 +114,7 @@ impl BVH {
         }
     }
 
-    fn bounding_box(&self, _t0: f32, _t1: f32) -> Option<Aabb> {
-        Some(self.bbox)
-    }
+    // fn bounding_box(&self, _t0: f32, _t1: f32) -> Option<Aabb> {
+    //     Some(self.bbox)
+    // }
 }
