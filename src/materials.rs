@@ -1,6 +1,6 @@
 use crate::color::{Color, BLACK, WHITE};
 use crate::intersection::Intersection;
-use crate::objects::Object;
+// use crate::objects::Object;
 use crate::ray::Ray;
 use crate::rendering::{random_distribution, random_sphere_distribution};
 use crate::texture::Texture;
@@ -14,6 +14,7 @@ pub enum Material {
     Dielectric(Dielectric),
     EmissiveDiffuse(EmissiveDiffuse),
     Isotropic(Isotropic),
+    Glossy(Glossy),
 }
 
 pub trait Tracable {
@@ -30,6 +31,7 @@ impl Tracable for Material {
             Material::Dielectric(ref mat) => mat.scatter(ray, inter),
             Material::EmissiveDiffuse(ref mat) => mat.scatter(ray, inter),
             Material::Isotropic(ref mat) => mat.scatter(ray, inter),
+            Material::Glossy(ref mat) => mat.scatter(ray, inter),
         }
     }
 
@@ -40,6 +42,7 @@ impl Tracable for Material {
             Material::Dielectric(ref _mat) => BLACK, //mat.emitted(uv, inter),
             Material::EmissiveDiffuse(ref mat) => mat.emitted(uv, inter),
             Material::Isotropic(ref _mat) => BLACK, //mat.emitted(uv, inter),
+            Material::Glossy(ref _mat) => BLACK,
         }
     }
 
@@ -47,9 +50,10 @@ impl Tracable for Material {
         match *self {
             Material::Labertian(ref mat) => mat.albedo(uv, point),
             Material::Metal(ref mat) => mat.albedo(uv, point),
-            Material::Dielectric(ref mat) => BLACK, //mat.albedo(uv, point),
+            Material::Dielectric(ref _mat) => BLACK, //mat.albedo(uv, point),
             Material::EmissiveDiffuse(ref mat) => mat.albedo(uv, point),
             Material::Isotropic(ref mat) => mat.albedo(uv, point),
+            Material::Glossy(ref mat) => mat.albedo(uv, point),
         }
     }
 }
@@ -259,9 +263,57 @@ impl Tracable for Isotropic {
     }
 
     fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
+        BLACK
+    }
+
+    fn albedo(&self, uv: (f32, f32), point: Vec3) -> Color {
+        self.texture.get_color_uv(uv, point)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Glossy {
+    pub texture: Texture,
+    pub roughness: f32,
+}
+
+impl Glossy {
+    pub fn new(texture: Texture, roughness: f32) -> Material {
+        Material::Glossy(Glossy { texture, roughness })
+    }
+}
+
+// not working :(
+impl Tracable for Glossy {
+    fn scatter(&self, ray: &Ray, inter: &Intersection) -> Option<(Color, Ray)> {
         // let outward_normal = inter.outward_normal;
-        // let uv = inter.uv;
-        // self.texture.get_color_uv(uv, inter.point)
+
+        let attenuation = self.texture.get_color_uv(inter.uv, inter.point);
+
+        // let mut scatter_dir = inter.point + inter.normal + random_sphere_distribution().normalize();
+        // if scatter_dir.near_zero() {
+        //     scatter_dir = inter.normal;
+        // }
+
+        // let reflected = Metal::reflect(ray.direction.normalize(), inter.normal);
+
+        // let combined = (scatter_dir + reflected / self.roughness).normalize();
+        Some((attenuation, Ray::new(inter.point, inter.normal, ray.time)))
+        // if random_distribution() > 0.5 {
+        //     // let direction = reflected + self.roughness * random_sphere_distribution().normalize();
+
+        //     Some((attenuation, Ray::new(inter.point, reflected, ray.time)))
+        // } else {
+        //     let normal = inter.normal;
+
+        //     Some((
+        //         attenuation,
+        //         Ray::new(inter.point, scatter_dir - inter.point, ray.time),
+        //     ))
+        // }
+    }
+
+    fn emitted(&self, _uv: (f32, f32), _inter: &Intersection) -> Color {
         BLACK
     }
 

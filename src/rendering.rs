@@ -1,4 +1,5 @@
 use crate::bvh::BvhTree;
+use crate::bvh2::BVH;
 use crate::color::*;
 //use crate::intersection::Intersection;
 //use crate::objects::Intersectable;
@@ -276,6 +277,72 @@ impl Camera {
         }
     }
 
+    pub fn bvh2_render(
+        &self,
+        world: &BVH,
+        background: &Color,
+        width: u32,
+        samples_per_pixel: u32,
+        max_depth: u32,
+        denoise_settings: Option<DenoiseSettings>,
+    ) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
+        let height = (width as f32 / self.aspect_ratio) as u32;
+
+        let mut img = RgbImage::new(width, height);
+
+        let bar = &Box::new(ProgressBar::new((width * height / 64) as u64));
+        bar.set_prefix("Rendering");
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{prefix:.white} [{eta_precise}] {bar:40.cyan/blue} {percent}%"),
+        );
+        let start = Instant::now();
+
+        let pixels: Vec<u8> = (0..height)
+            .into_par_iter()
+            .rev()
+            .flat_map(|j| {
+                (0..width).into_par_iter().flat_map(move |i| {
+                    let mut col = BLACK;
+
+                    for _s in 0..samples_per_pixel {
+                        let u = ((i as f32) + rand::random::<f32>()) / (width as f32);
+                        let v = ((j as f32) + rand::random::<f32>()) / (height as f32);
+
+                        let r = self.get_ray(u, v);
+                        col = col + r.bvh2_color(world, background, max_depth);
+                    }
+
+                    if i % 64 == 0 {
+                        bar.inc(1);
+                    }
+
+                    col = (col / samples_per_pixel as f32).sqrt();
+                    let v_col = col.to_vec_f32();
+                    (0..3)
+                        .into_par_iter()
+                        .map(move |k| (255.99 * v_col[k as usize]).min(255.0) as u8)
+                })
+            })
+            .collect();
+
+        bar.finish();
+
+        img.copy_from_slice(&pixels);
+        img.save("regular.png").unwrap();
+        println!("Finished in {:?}", start.elapsed());
+
+        match denoise_settings {
+            Some(dns) => {
+                println!("Starting Denoising");
+                let (albedo_buffer, normal_buffer) =
+                    self.bvh2_calculate_buffers(world, background, width);
+                dns.denoise(img, albedo_buffer, normal_buffer)
+            }
+            None => img,
+        }
+    }
+
     pub fn pog_render(
         &self,
         world: &Vec<Object>,
@@ -370,6 +437,50 @@ impl Camera {
                 let r = self.get_ray(u, v);
 
                 let (albedo, normal) = r.bvh_buffer(world, background);
+                (albedo).into_iter().for_each(|a| albedo_buffer.push(a));
+                (normal).into_iter().for_each(|n| normal_buffer.push(n));
+                //  albedo_buffer.copy_from_slice(&albedo);
+                //normal_buffer.copy_from_slice(&normal);
+
+                bar.inc(1);
+            }
+        }
+
+        bar.finish();
+        println!("Took {:?}", t1.elapsed());
+
+        (albedo_buffer, normal_buffer)
+    }
+
+    pub fn bvh2_calculate_buffers(
+        &self,
+        world: &BVH,
+        background: &Color,
+        width: u32,
+    ) -> (Vec<f32>, Vec<f32>) {
+        let height = (width as f32 / self.aspect_ratio) as u32;
+
+        let bar = ProgressBar::new((width * height) as u64);
+
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:50.yellow/yellow} {pos:>7}/{len:7} pixels"),
+        );
+
+        println!("Rendering Buffers {}x{}", width, height);
+
+        let t1 = Instant::now();
+
+        let mut normal_buffer: Vec<f32> = Vec::new();
+        let mut albedo_buffer: Vec<f32> = Vec::new();
+
+        for y in 0..height {
+            for x in 0..width {
+                let u = x as f32 / (width - 1) as f32;
+                let v = (height - 1 - y) as f32 / (height - 1) as f32;
+                let r = self.get_ray(u, v);
+
+                let (albedo, normal) = r.bvh2_buffer(world, background);
                 (albedo).into_iter().for_each(|a| albedo_buffer.push(a));
                 (normal).into_iter().for_each(|n| normal_buffer.push(n));
                 //  albedo_buffer.copy_from_slice(&albedo);
