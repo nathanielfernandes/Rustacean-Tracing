@@ -1,6 +1,6 @@
 # Rustacean-Tracing
 
-## A Physically based path tracer written in Rust. `WIP 🏗️`
+## A toy path tracer written in Rust. `WIP 🏗️`
 
 This path tracer runs entirely on the cpu and is shape/object agnostic. <br>
 Scenes are rendered on multiple threads.
